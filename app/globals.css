@@ -1,26 +1,197 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@layer base {
+  /* ========================================
+     🎨 MODERN PROFESSIONAL THEME
+     Clean, Readable, Focus on Content
+     ======================================== */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* Background: Light neutral */
+    --background: 210 14% 97%;
+    /* #f6f7f8 */
+    --foreground: 215 28% 17%;
+    /* slate-900 */
+
+    /* Cards: Pure white */
+    --card: 0 0% 100%;
+    --card-foreground: 215 28% 17%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 28% 17%;
+
+    /* Primary: Modern Blue */
+    --primary: 209 88% 50%;
+    /* #137fec */
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary: Light gray */
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 215 28% 17%;
+
+    /* Muted */
+    --muted: 220 14% 96%;
+    --muted-foreground: 215 16% 47%;
+    /* slate-500 */
+
+    /* Accent */
+    --accent: 220 14% 96%;
+    --accent-foreground: 215 28% 17%;
+
+    /* Status Colors */
+    --destructive: 0 84% 60%;
+    /* red-500 */
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 160 84% 39%;
+    /* emerald-500 */
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    /* amber-500 */
+    --warning-foreground: 0 0% 0%;
+
+    /* Borders */
+    --border: 220 13% 91%;
+    /* gray-200 */
+    --input: 220 13% 91%;
+    --ring: 209 88% 50%;
+
+    /* Rounded corners */
+    --radius: 0.75rem;
+
+    /* Font */
+    --font-sans: "Inter", system-ui, sans-serif;
+  }
+
+  /* Dark Mode: Navy Professional */
+  .dark {
+    --background: 213 35% 10%;
+    /* #101922 */
+    --foreground: 0 0% 100%;
+
+    --card: 210 24% 16%;
+    /* #1c2630 */
+    --card-foreground: 0 0% 100%;
+
+    --popover: 210 24% 16%;
+    --popover-foreground: 0 0% 100%;
+
+    --primary: 209 88% 50%;
+    /* #137fec */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 24% 20%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 210 24% 20%;
+    --muted-foreground: 207 31% 68%;
+    /* #92adc9 */
+
+    --accent: 210 24% 20%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 209 30% 30%;
+    /* #324d67 */
+    --input: 209 30% 30%;
+    --ring: 209 88% 50%;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+  }
+
+  /* Typography */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-bold tracking-tight;
+  }
+}
+
+@layer components {
+  /* 
+     🎯 MODERN COMPONENT STYLES
+     Subtle shadows, rounded corners
+  */
+
+  .card,
+  [role="dialog"]>div {
+    @apply border border-border rounded-xl;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  }
+
+  .dark .card,
+  .dark [role="dialog"]>div {
+    @apply border-border;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3);
+  }
+
+  /* Buttons: Modern feel */
+  button[type="submit"],
+  button[type="button"],
+  .btn {
+    @apply transition-all duration-200;
+  }
+
+  button[type="submit"]:active,
+  button[type="button"]:active,
+  .btn:active {
+    transform: scale(0.98);
+  }
+
+  /* Form Inputs */
+  input,
+  select,
+  textarea {
+    @apply rounded-lg border-border transition-all;
+    font-family: var(--font-sans);
+  }
+
+  input:focus,
+  select:focus,
+  textarea:focus {
+    @apply ring-2 ring-primary/20 border-primary;
+  }
+}
+
+@layer utilities {
+
+  /* Text utilities */
+  .text-secondary {
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* Surface dark (for cards in dark mode) */
+  .bg-surface-dark {
+    background-color: hsl(210 24% 16%);
+  }
+
+  /* Alert colors */
+  .text-alert {
+    color: #fa6238;
+  }
+
+  .bg-alert {
+    background-color: #fa6238;
+  }
+
+  .bg-alert-bg {
+    background-color: rgba(250, 98, 56, 0.15);
+  }
 }

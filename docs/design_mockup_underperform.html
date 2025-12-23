@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Underperformers Report</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#137fec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101922",
+                        "surface-dark": "#1b2631",
+                        "alert": "#fa6238",
+                        "alert-bg": "rgba(250, 98, 56, 0.15)",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "Noto Sans", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+    <style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+</head>
+
+<body
+    class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white antialiased selection:bg-primary selection:text-white">
+    <div
+        class="relative flex h-full min-h-screen w-full flex-col overflow-x-hidden max-w-md mx-auto shadow-2xl bg-background-light dark:bg-background-dark">
+        <!-- Sticky Header -->
+        <div
+            class="sticky top-0 z-50 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-sm border-b border-slate-200 dark:border-slate-800">
+            <div class="flex items-center p-4 pb-2 justify-between">
+                <button
+                    class="text-slate-900 dark:text-white flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">
+                    <span class="material-symbols-outlined text-[24px]">arrow_back</span>
+                </button>
+                <h2
+                    class="text-slate-900 dark:text-white text-base font-bold leading-tight tracking-tight flex-1 text-center uppercase">
+                    Manager Area | Underperform</h2>
+                <div class="size-10"></div>
+            </div>
+        </div>
+        <!-- Date Headline -->
+        <div class="px-4 py-2">
+            <h3 class="text-slate-500 dark:text-slate-400 text-sm font-semibold tracking-wider uppercase mb-1">Date</h3>
+            <p class="text-slate-900 dark:text-white text-2xl font-bold leading-tight">Monday, 24 Oct 2023</p>
+        </div>
+        <!-- Stats Summary Cards -->
+        <div class="flex gap-3 overflow-x-auto px-4 py-4 pb-2 no-scrollbar">
+            <div
+                class="flex min-w-[140px] flex-1 flex-col gap-1 rounded-xl p-4 bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group">
+                <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <span class="material-symbols-outlined text-4xl text-alert">domain</span>
+                </div>
+                <p class="text-slate-500 dark:text-slate-400 text-xs font-bold tracking-widest uppercase z-10">AREA</p>
+                <div class="flex items-end gap-2 z-10">
+                    <p class="text-slate-900 dark:text-white text-3xl font-bold leading-none">3</p>
+                    <span class="text-alert text-xs font-medium mb-1 bg-alert/10 px-1.5 py-0.5 rounded">-10%</span>
+                </div>
+            </div>
+            <div
+                class="flex min-w-[140px] flex-1 flex-col gap-1 rounded-xl p-4 bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group">
+                <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <span class="material-symbols-outlined text-4xl text-alert">person</span>
+                </div>
+                <p class="text-slate-500 dark:text-slate-400 text-xs font-bold tracking-widest uppercase z-10">SATOR</p>
+                <div class="flex items-end gap-2 z-10">
+                    <p class="text-slate-900 dark:text-white text-3xl font-bold leading-none">12</p>
+                    <span class="text-alert text-xs font-medium mb-1 bg-alert/10 px-1.5 py-0.5 rounded">-5%</span>
+                </div>
+            </div>
+            <div
+                class="flex min-w-[140px] flex-1 flex-col gap-1 rounded-xl p-4 bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group">
+                <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <span class="material-symbols-outlined text-4xl text-alert">groups</span>
+                </div>
+                <p class="text-slate-500 dark:text-slate-400 text-xs font-bold tracking-widest uppercase z-10">PROMOTOR
+                </p>
+                <div class="flex items-end gap-2 z-10">
+                    <p class="text-slate-900 dark:text-white text-3xl font-bold leading-none">45</p>
+                    <span class="text-alert text-xs font-medium mb-1 bg-alert/10 px-1.5 py-0.5 rounded">-15%</span>
+                </div>
+            </div>
+        </div>
+        <!-- Segmented Control (Tabs) -->
+        <div class="px-4 py-2 sticky top-[60px] z-40 bg-background-light dark:bg-background-dark pb-4">
+            <div class="flex w-full rounded-lg bg-slate-200 dark:bg-surface-dark p-1">
+                <label class="flex-1 cursor-pointer">
+                    <input class="peer sr-only" name="view-filter" type="radio" value="AREA" />
+                    <div
+                        class="flex items-center justify-center rounded-[4px] py-1.5 text-sm font-medium text-slate-500 transition-all peer-checked:bg-white dark:peer-checked:bg-primary peer-checked:text-slate-900 dark:peer-checked:text-white peer-checked:shadow-sm">
+                        AREA
+                    </div>
+                </label>
+                <label class="flex-1 cursor-pointer">
+                    <input checked="" class="peer sr-only" name="view-filter" type="radio" value="SATOR" />
+                    <div
+                        class="flex items-center justify-center rounded-[4px] py-1.5 text-sm font-medium text-slate-500 transition-all peer-checked:bg-white dark:peer-checked:bg-primary peer-checked:text-slate-900 dark:peer-checked:text-white peer-checked:shadow-sm">
+                        SATOR
+                    </div>
+                </label>
+                <label class="flex-1 cursor-pointer">
+                    <input class="peer sr-only" name="view-filter" type="radio" value="PROMOTOR" />
+                    <div
+                        class="flex items-center justify-center rounded-[4px] py-1.5 text-sm font-medium text-slate-500 transition-all peer-checked:bg-white dark:peer-checked:bg-primary peer-checked:text-slate-900 dark:peer-checked:text-white peer-checked:shadow-sm">
+                        PROMOTOR
+                    </div>
+                </label>
+            </div>
+        </div>
+        <!-- Table Header -->
+        <div
+            class="px-4 pb-2 flex items-center justify-between text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+            <span>Details</span>
+            <span>Performance</span>
+        </div>
+        <!-- List Section -->
+        <div class="flex flex-col gap-3 px-4 pb-20">
+            <!-- Item 1 -->
+            <div class="flex flex-col gap-3 rounded-xl border border-alert/30 bg-alert-bg p-4 relative overflow-hidden">
+                <div class="absolute left-0 top-0 bottom-0 w-1 bg-alert"></div>
+                <div class="flex items-start justify-between gap-4 pl-2">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-center bg-no-repeat bg-cover rounded-full h-12 w-12 border-2 border-alert shadow-sm shrink-0"
+                            data-alt="Portrait of John Doe"
+                            style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCfMhchB5SjiBYvsuVw1JhH49fXd2gK9hD-Md7ktdVfdDTxhrlyJDlvgukGWsp78CJ2qe6stUV9tAIP49zb7c1yOqt0Bb_5-yolT9za76v1Hq3gQXM9itECrt-MQj3QHvHF46_gjF-OfPYx2rDKVoIN84SSTL5fkMwW4twjrlix3cIHWUuuSaCzlJNku7t1_Y87n54W9N13_dkp4C5N-ujT1d2l4HMAwZK8_jcwkapsDI2qAjxevgXFwCkd0t1yZHMcCr9pGJAFR2c");'>
+                        </div>
+                        <div>
+                            <h4 class="text-slate-900 dark:text-white font-bold text-base leading-tight">John Doe</h4>
+                            <p class="text-slate-600 dark:text-slate-300 text-xs mt-0.5">Area: Jakarta South</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-end">
+                        <span class="text-alert font-bold text-lg">-60 GAP</span>
+                        <div
+                            class="flex items-center gap-1 text-alert text-xs font-medium bg-white/50 dark:bg-black/20 px-1.5 py-0.5 rounded">
+                            <span class="material-symbols-outlined text-[14px]">trending_down</span>
+                            40%
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2 pl-2 border-t border-alert/20 pt-3 mt-1">
+                    <div class="flex flex-col">
+                        <span class="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase">Target
+                            (TGT)</span>
+                        <span class="text-slate-900 dark:text-white font-mono font-medium">100</span>
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase">Input
+                            (INP)</span>
+                        <span class="text-slate-900 dark:text-white font-mono font-medium">40</span>
+                    </div>
+                </div>
+            </div>
+            <!-- Item 2 -->
+            <div class="flex flex-col gap-3 rounded-xl border border-alert/30 bg-alert-bg p-4 relative overflow-hidden">
+                <div class="absolute left-0 top-0 bottom-0 w-1 bg-alert"></div>
+                <div class="flex items-start justify-between gap-4 pl-2">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-center bg-no-repeat bg-cover rounded-full h-12 w-12 border-2 border-alert shadow-sm shrink-0"
+                            data-alt="Portrait of Sarah Smith"
+                            style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBvvLrfg5o7VsmCVYHGfzebCqzDkPe6Zh6HyFQEzuWFDP_qQY4JYt0WedgpRYwD7_jeNv_1Aabvc5On6FCSf_uREvFaNc3B-JMGPGaJzkl58PvkTLAV0yw07hSmBlVXDBqR0s23hB-YG7qUMyyoF3cm7oR1Ng99aBI9eJNczYb76Bl4miDDctQigPv56K_VgZJ1J-CD31ix-Ss95ryZ_VWZI27nOfJRgba-5pvtNdihxKW9UhFDejv1-LpMSceGjgVunG6iAjwzm1k");'>
+                        </div>
+                        <div>
+                            <h4 class="text-slate-900 dark:text-white font-bold text-base leading-tight">Sarah Smith
+                            </h4>
+                            <p class="text-slate-600 dark:text-slate-300 text-xs mt-0.5">Area: Bandung West</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-end">
+                        <span class="text-alert font-bold text-lg">-85 GAP</span>
+                        <div
+                            class="flex items-center gap-1 text-alert text-xs font-medium bg-white/50 dark:bg-black/20 px-1.5 py-0.5 rounded">
+                            <span class="material-symbols-outlined text-[14px]">trending_down</span>
+                            32%
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2 pl-2 border-t border-alert/20 pt-3 mt-1">
+                    <div class="flex flex-col">
+                        <span class="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase">Target
+                            (TGT)</span>
+                        <span class="text-slate-900 dark:text-white font-mono font-medium">125</span>
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase">Input
+                            (INP)</span>
+                        <span class="text-slate-900 dark:text-white font-mono font-medium">40</span>
+                    </div>
+                </div>
+            </div>
+            <!-- Item 3 -->
+            <div class="flex flex-col gap-3 rounded-xl border border-alert/30 bg-alert-bg p-4 relative overflow-hidden">
+                <div class="absolute left-0 top-0 bottom-0 w-1 bg-alert"></div>
+                <div class="flex items-start justify-between gap-4 pl-2">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-center bg-no-repeat bg-cover rounded-full h-12 w-12 border-2 border-alert shadow-sm shrink-0"
+                            data-alt="Portrait of Michael Wong"
+                            style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAZgaOmO_akCNN-sK5DN2C0IFzOCz_Tth-bourRDtFsseCCgLc-4Qq_uqMgJLVGfKQOenvQxwne1EQCDYP4nYiAfURZM-dzj_bQQhCRGtY_bpnatNiYF8Pyxz01B24_RMZkbJ-lmSszKQAPTvEUUKc85sWNkpWGltpT3ImXAwKHzUVdHJqjqcn9KrS_Pz-w_LNKnTwtDXABFslfttjL6FwQK2YmMfp8mbPIzeJWFZu8USGo_LBzGMYCGq18pq-P6CKm5gMaHhiRa-w");'>
+                        </div>
+                        <div>
+                            <h4 class="text-slate-900 dark:text-white font-bold text-base leading-tight">Michael Wong
+                            </h4>
+                            <p class="text-slate-600 dark:text-slate-300 text-xs mt-0.5">Area: Surabaya North</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-end">
+                        <span class="text-alert font-bold text-lg">-20 GAP</span>
+                        <div
+                            class="flex items-center gap-1 text-alert text-xs font-medium bg-white/50 dark:bg-black/20 px-1.5 py-0.5 rounded">
+                            <span class="material-symbols-outlined text-[14px]">trending_down</span>
+                            10%
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2 pl-2 border-t border-alert/20 pt-3 mt-1">
+                    <div class="flex flex-col">
+                        <span class="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase">Target
+                            (TGT)</span>
+                        <span class="text-slate-900 dark:text-white font-mono font-medium">200</span>
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase">Input
+                            (INP)</span>
+                        <span class="text-slate-900 dark:text-white font-mono font-medium">180</span>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-4 flex justify-center">
+                <p class="text-xs text-slate-400 dark:text-slate-600 font-medium">End of list</p>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

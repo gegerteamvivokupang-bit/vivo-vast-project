@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Performance Monitoring</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#137fec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101922",
+                        "surface-dark": "#1c2630",
+                        "text-secondary": "#92adc9",
+                        "alert-bg": "rgba(239, 68, 68, 0.15)",
+                        "alert-text": "#fca5a5"
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+    <style>
+        /* Custom scrollbar for better look on dark theme */
+        ::-webkit-scrollbar {
+            height: 6px;
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #101922;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #233648;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #344c61;
+        }
+
+        /* Sticky column handling */
+        .sticky-col-bg {
+            background-color: #101922;
+            /* Matches main background */
+        }
+
+        .alert-row .sticky-col-bg {
+            background-color: #2a1c1c;
+            /* Dark reddish bg to match alert row opacity effect */
+        }
+    </style>
+    <style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+</head>
+
+<body class="bg-background-light dark:bg-background-dark min-h-screen font-display text-white overflow-x-hidden">
+    <div
+        class="relative flex h-full min-h-screen w-full flex-col max-w-md mx-auto border-x border-[#233648]/30 shadow-2xl">
+        <!-- TopAppBar -->
+        <div
+            class="flex items-center bg-background-dark p-4 pb-2 justify-between sticky top-0 z-30 border-b border-[#233648]">
+            <div
+                class="text-white flex size-12 shrink-0 items-center justify-center rounded-full hover:bg-white/5 cursor-pointer transition-colors">
+                <span class="material-symbols-outlined text-white" style="font-size: 24px;">arrow_back</span>
+            </div>
+            <h2 class="text-white text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center pr-12">
+                Performance Monitoring</h2>
+        </div>
+        <!-- Scrollable Content Area -->
+        <div class="flex-1 flex flex-col w-full">
+            <!-- Header Section -->
+            <div class="bg-background-dark pt-6 pb-2">
+                <h3 class="text-white tracking-light text-xl font-bold leading-tight px-4 text-center">MANAGER AREA |
+                    PERFORMANCE</h3>
+                <p class="text-text-secondary text-sm font-normal leading-normal pt-1 px-4 text-center">Mon, 23 Oct 2023
+                </p>
+            </div>
+            <!-- Breadcrumbs / Chips -->
+            <div
+                class="flex items-center gap-2 px-4 py-3 overflow-x-auto no-scrollbar border-b border-[#233648]/50 bg-background-dark/50 backdrop-blur-sm sticky top-[65px] z-20">
+                <div class="flex items-center gap-2 shrink-0">
+                    <button
+                        class="flex h-7 items-center justify-center gap-x-1 rounded-full bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 px-3 transition-colors">
+                        <span class="text-xs font-semibold">All Areas</span>
+                    </button>
+                    <span class="material-symbols-outlined text-text-secondary"
+                        style="font-size: 16px;">chevron_right</span>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <button
+                        class="flex h-7 items-center justify-center gap-x-1 rounded-full bg-surface-dark hover:bg-[#233648] text-text-secondary px-3 transition-colors border border-transparent">
+                        <span class="text-xs font-medium">North Jakarta</span>
+                    </button>
+                    <span class="material-symbols-outlined text-text-secondary"
+                        style="font-size: 16px;">chevron_right</span>
+                </div>
+                <div
+                    class="flex h-7 shrink-0 items-center justify-center rounded-full bg-surface-dark text-text-secondary px-3 opacity-50">
+                    <span class="text-xs font-medium">Team A</span>
+                </div>
+            </div>
+            <!-- Segmented Control -->
+            <div class="px-4 py-4 bg-background-dark">
+                <div class="flex h-10 w-full items-center justify-center rounded-lg bg-[#233648] p-1">
+                    <label
+                        class="flex cursor-pointer h-full flex-1 items-center justify-center overflow-hidden rounded-[4px] px-2 transition-all has-[:checked]:bg-primary has-[:checked]:text-white text-text-secondary hover:text-white">
+                        <span class="truncate text-xs font-bold tracking-wide">AREA</span>
+                        <input checked="" class="invisible w-0 fixed" name="view_mode" type="radio" value="AREA" />
+                    </label>
+                    <label
+                        class="flex cursor-pointer h-full flex-1 items-center justify-center overflow-hidden rounded-[4px] px-2 transition-all has-[:checked]:bg-primary has-[:checked]:text-white text-text-secondary hover:text-white">
+                        <span class="truncate text-xs font-bold tracking-wide">SATOR</span>
+                        <input class="invisible w-0 fixed" name="view_mode" type="radio" value="SATOR" />
+                    </label>
+                    <label
+                        class="flex cursor-pointer h-full flex-1 items-center justify-center overflow-hidden rounded-[4px] px-2 transition-all has-[:checked]:bg-primary has-[:checked]:text-white text-text-secondary hover:text-white">
+                        <span class="truncate text-xs font-bold tracking-wide">PROMOTOR</span>
+                        <input class="invisible w-0 fixed" name="view_mode" type="radio" value="PROMOTOR" />
+                    </label>
+                </div>
+            </div>
+            <!-- Performance Table -->
+            <div class="flex-1 overflow-x-auto bg-background-dark pb-20">
+                <div class="inline-block min-w-full align-middle">
+                    <table class="min-w-full border-separate border-spacing-0">
+                        <thead class="bg-[#1c2630]">
+                            <tr>
+                                <th class="sticky left-0 z-10 bg-[#1c2630] py-3.5 pl-4 pr-3 text-left text-xs font-bold uppercase tracking-wide text-text-secondary border-b border-[#233648] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)]"
+                                    scope="col">
+                                    NAMA
+                                </th>
+                                <th class="whitespace-nowrap px-3 py-3.5 text-right text-xs font-bold uppercase tracking-wide text-text-secondary border-b border-[#233648]"
+                                    scope="col">
+                                    TGT
+                                </th>
+                                <th class="whitespace-nowrap px-3 py-3.5 text-right text-xs font-bold uppercase tracking-wide text-text-secondary border-b border-[#233648]"
+                                    scope="col">
+                                    INP
+                                </th>
+                                <th class="whitespace-nowrap px-3 py-3.5 text-right text-xs font-bold uppercase tracking-wide text-text-secondary border-b border-[#233648]"
+                                    scope="col">
+                                    %
+                                </th>
+                                <th class="whitespace-nowrap px-3 py-3.5 text-right text-xs font-bold uppercase tracking-wide text-text-secondary border-b border-[#233648]"
+                                    scope="col">
+                                    CLS
+                                </th>
+                                <th class="whitespace-nowrap px-3 py-3.5 text-right text-xs font-bold uppercase tracking-wide text-text-secondary border-b border-[#233648]"
+                                    scope="col">
+                                    PND
+                                </th>
+                                <th class="whitespace-nowrap px-3 py-3.5 text-right text-xs font-bold uppercase tracking-wide text-text-secondary border-b border-[#233648]"
+                                    scope="col">
+                                    REJ
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-[#233648]">
+                            <!-- Row 1: Normal -->
+                            <tr class="group hover:bg-[#1c2630]/50 transition-colors cursor-pointer">
+                                <td
+                                    class="whitespace-nowrap sticky left-0 z-10 sticky-col-bg py-4 pl-4 pr-3 text-sm font-medium text-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)] group-hover:bg-[#1c2630]">
+                                    Kelapa Gading
+                                </td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    150</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    142</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm font-bold text-primary font-mono">
+                                    94%</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    130</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    8</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    4</td>
+                            </tr>
+                            <!-- Row 2: Alert (Low Performance) -->
+                            <tr
+                                class="group alert-row bg-alert-bg hover:bg-red-900/20 transition-colors cursor-pointer border-l-2 border-red-500">
+                                <td
+                                    class="whitespace-nowrap sticky left-0 z-10 sticky-col-bg py-4 pl-4 pr-3 text-sm font-medium text-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)] group-hover:bg-[#2a1c1c]">
+                                    <div class="flex items-center gap-2">
+                                        <span class="material-symbols-outlined text-red-500"
+                                            style="font-size: 16px;">warning</span>
+                                        Pluit Village
+                                    </div>
+                                </td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    200</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    85</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm font-bold text-red-400 font-mono">
+                                    42%</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    60</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    20</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    5</td>
+                            </tr>
+                            <!-- Row 3: Normal -->
+                            <tr class="group hover:bg-[#1c2630]/50 transition-colors cursor-pointer">
+                                <td
+                                    class="whitespace-nowrap sticky left-0 z-10 sticky-col-bg py-4 pl-4 pr-3 text-sm font-medium text-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)] group-hover:bg-[#1c2630]">
+                                    Sunter Mall
+                                </td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    120</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    100</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm font-bold text-emerald-400 font-mono">
+                                    83%</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    95</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    2</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    3</td>
+                            </tr>
+                            <!-- Row 4: Normal -->
+                            <tr class="group hover:bg-[#1c2630]/50 transition-colors cursor-pointer">
+                                <td
+                                    class="whitespace-nowrap sticky left-0 z-10 sticky-col-bg py-4 pl-4 pr-3 text-sm font-medium text-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)] group-hover:bg-[#1c2630]">
+                                    Ancol City
+                                </td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    180</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    160</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm font-bold text-emerald-400 font-mono">
+                                    88%</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    155</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    3</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    2</td>
+                            </tr>
+                            <!-- Row 5: Alert (Low Performance) -->
+                            <tr
+                                class="group alert-row bg-alert-bg hover:bg-red-900/20 transition-colors cursor-pointer border-l-2 border-red-500">
+                                <td
+                                    class="whitespace-nowrap sticky left-0 z-10 sticky-col-bg py-4 pl-4 pr-3 text-sm font-medium text-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)] group-hover:bg-[#2a1c1c]">
+                                    <div class="flex items-center gap-2">
+                                        <span class="material-symbols-outlined text-red-500"
+                                            style="font-size: 16px;">warning</span>
+                                        Tanjung Priok
+                                    </div>
+                                </td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    250</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    120</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm font-bold text-red-400 font-mono">
+                                    48%</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    100</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    15</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    5</td>
+                            </tr>
+                            <!-- Row 6: Normal -->
+                            <tr class="group hover:bg-[#1c2630]/50 transition-colors cursor-pointer">
+                                <td
+                                    class="whitespace-nowrap sticky left-0 z-10 sticky-col-bg py-4 pl-4 pr-3 text-sm font-medium text-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)] group-hover:bg-[#1c2630]">
+                                    Marunda
+                                </td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    100</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    92</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm font-bold text-emerald-400 font-mono">
+                                    92%</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    90</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    1</td>
+                                <td
+                                    class="whitespace-nowrap px-3 py-4 text-right text-sm text-text-secondary font-mono">
+                                    1</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- Footer Legend -->
+            <div
+                class="fixed bottom-0 left-0 right-0 bg-[#1c2630] border-t border-[#233648] p-4 pb-6 z-40 max-w-md mx-auto">
+                <div class="flex items-start gap-3">
+                    <span
+                        class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-500/20 text-red-500">
+                        <span class="material-symbols-outlined" style="font-size: 14px;">priority_high</span>
+                    </span>
+                    <div class="flex flex-col gap-1">
+                        <p class="text-xs font-medium text-white">Underperformance Alert</p>
+                        <p class="text-xs text-text-secondary">Rows highlighted in red indicate achievement below 50%.
+                            Tap any row to drill down into specific details.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

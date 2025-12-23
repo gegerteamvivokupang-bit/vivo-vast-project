@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Report Export</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#137fec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101922",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+    <style>
+        /* Custom scrollbar for horizontal tables if needed */
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+    <style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+</head>
+
+<body
+    class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-white overflow-x-hidden antialiased selection:bg-primary selection:text-white">
+    <div class="relative flex h-full min-h-screen w-full flex-col pb-24">
+        <!-- TopAppBar -->
+        <div
+            class="sticky top-0 z-50 flex items-center bg-background-light dark:bg-background-dark p-4 pb-2 justify-between border-b border-gray-200 dark:border-white/5 backdrop-blur-md bg-opacity-90 dark:bg-opacity-90">
+            <button
+                class="text-slate-900 dark:text-white flex size-12 shrink-0 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+                <span class="material-symbols-outlined">arrow_back</span>
+            </button>
+            <h2
+                class="text-slate-900 dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center pr-12">
+                MANAGER AREA | EXPORT
+            </h2>
+        </div>
+        <!-- Subtitle/Description -->
+        <div class="px-4 py-4">
+            <h1 class="text-2xl font-bold text-slate-900 dark:text-white mb-1">Export Laporan</h1>
+            <p class="text-slate-500 dark:text-slate-400 text-base font-normal leading-normal">
+                Tarik laporan lengkap kinerja tim dan area.
+            </p>
+        </div>
+        <!-- Section 1: Sumber Data -->
+        <div class="px-4 mt-2">
+            <h2
+                class="text-slate-900 dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] text-left pb-3 pt-2">
+                Sumber Data
+            </h2>
+            <div class="bg-white dark:bg-[#1C2630] rounded-xl p-2 shadow-sm border border-gray-100 dark:border-white/5">
+                <div class="flex flex-col"
+                    style="--checkbox-tick-svg: url('data:image/svg+xml,%3csvg viewBox=%270 0 16 16%27 fill=%27rgb(255,255,255)%27 xmlns=%27http://www.w3.org/2000/svg%27%3e%3cpath d=%27M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z%27/%3e%3c/svg%3e');">
+                    <label
+                        class="group flex gap-x-3 p-3 flex-row items-center hover:bg-gray-50 dark:hover:bg-white/5 rounded-lg cursor-pointer transition-colors">
+                        <input checked=""
+                            class="peer h-5 w-5 rounded border-slate-300 dark:border-[#324d67] border-2 bg-transparent text-primary checked:bg-primary checked:border-primary checked:bg-[image:--checkbox-tick-svg] focus:ring-0 focus:ring-offset-0 focus:outline-none transition-all"
+                            type="checkbox" />
+                        <div class="flex flex-col">
+                            <p class="text-slate-900 dark:text-white text-base font-medium leading-normal">PERFORMANCE
+                            </p>
+                            <span class="text-xs text-slate-500 dark:text-slate-400">Data pencapaian target
+                                harian</span>
+                        </div>
+                    </label>
+                    <div class="h-px bg-gray-100 dark:bg-white/5 mx-3"></div>
+                    <label
+                        class="group flex gap-x-3 p-3 flex-row items-center hover:bg-gray-50 dark:hover:bg-white/5 rounded-lg cursor-pointer transition-colors">
+                        <input
+                            class="peer h-5 w-5 rounded border-slate-300 dark:border-[#324d67] border-2 bg-transparent text-primary checked:bg-primary checked:border-primary checked:bg-[image:--checkbox-tick-svg] focus:ring-0 focus:ring-offset-0 focus:outline-none transition-all"
+                            type="checkbox" />
+                        <div class="flex flex-col">
+                            <p class="text-slate-900 dark:text-white text-base font-medium leading-normal">UNDERPERFORM
+                            </p>
+                            <span class="text-xs text-slate-500 dark:text-slate-400">Daftar unit dibawah target</span>
+                        </div>
+                    </label>
+                    <div class="h-px bg-gray-100 dark:bg-white/5 mx-3"></div>
+                    <label
+                        class="group flex gap-x-3 p-3 flex-row items-center hover:bg-gray-50 dark:hover:bg-white/5 rounded-lg cursor-pointer transition-colors">
+                        <input
+                            class="peer h-5 w-5 rounded border-slate-300 dark:border-[#324d67] border-2 bg-transparent text-primary checked:bg-primary checked:border-primary checked:bg-[image:--checkbox-tick-svg] focus:ring-0 focus:ring-offset-0 focus:outline-none transition-all"
+                            type="checkbox" />
+                        <div class="flex flex-col">
+                            <p class="text-slate-900 dark:text-white text-base font-medium leading-normal">SUMMARY</p>
+                            <span class="text-xs text-slate-500 dark:text-slate-400">Ringkasan eksekutif mingguan</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+        </div>
+        <!-- Section 2: Format -->
+        <div class="px-4 mt-6">
+            <h2
+                class="text-slate-900 dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] text-left pb-3 pt-2">
+                Format
+            </h2>
+            <div class="grid grid-cols-2 gap-4">
+                <label
+                    class="relative flex flex-col items-center justify-center p-4 rounded-xl border-2 border-primary bg-primary/5 dark:bg-primary/10 cursor-pointer">
+                    <input checked=""
+                        class="absolute top-3 right-3 h-5 w-5 text-primary border-slate-300 dark:border-[#324d67] focus:ring-0 focus:ring-offset-0"
+                        name="format" type="radio" />
+                    <span class="material-symbols-outlined text-4xl text-primary mb-2">table_view</span>
+                    <span class="text-sm font-semibold text-primary">EXCEL (.XLSX)</span>
+                </label>
+                <label
+                    class="relative flex flex-col items-center justify-center p-4 rounded-xl border border-gray-200 dark:border-[#324d67] bg-white dark:bg-[#1C2630] hover:bg-gray-50 dark:hover:bg-white/5 transition-all cursor-pointer">
+                    <input
+                        class="absolute top-3 right-3 h-5 w-5 text-primary border-slate-300 dark:border-[#324d67] bg-transparent focus:ring-0 focus:ring-offset-0"
+                        name="format" type="radio" />
+                    <span class="material-symbols-outlined text-4xl text-slate-400 mb-2">image</span>
+                    <span class="text-sm font-medium text-slate-600 dark:text-slate-300">PNG (2 GAMBAR)</span>
+                </label>
+            </div>
+        </div>
+        <!-- Section 3: Preview -->
+        <div class="px-4 mt-8">
+            <div class="flex items-center justify-between pb-3 pt-2">
+                <h2 class="text-slate-900 dark:text-white text-lg font-bold leading-tight tracking-[-0.015em]">
+                    Preview Data
+                </h2>
+                <span class="text-xs font-medium text-primary cursor-pointer hover:underline">Lihat Semua</span>
+            </div>
+            <!-- Table 1: Laporan Area -->
+            <div
+                class="mb-6 bg-white dark:bg-[#1C2630] rounded-xl overflow-hidden shadow-sm border border-gray-100 dark:border-white/5">
+                <div
+                    class="px-4 py-3 border-b border-gray-100 dark:border-white/5 flex items-center justify-between bg-gray-50 dark:bg-white/5">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Laporan
+                        Area</h3>
+                    <span class="material-symbols-outlined text-slate-400 text-sm">visibility</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm whitespace-nowrap">
+                        <thead
+                            class="text-xs text-slate-500 dark:text-slate-400 border-b border-gray-100 dark:border-white/5">
+                            <tr>
+                                <th class="px-4 py-3 font-medium">Region</th>
+                                <th class="px-4 py-3 font-medium text-right">Target</th>
+                                <th class="px-4 py-3 font-medium text-right">Achieved</th>
+                                <th class="px-4 py-3 font-medium text-right">%</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-slate-700 dark:text-slate-200">
+                            <tr class="border-b border-gray-100 dark:border-white/5">
+                                <td class="px-4 py-3 font-medium">Jakarta Selatan</td>
+                                <td class="px-4 py-3 text-right text-slate-500 dark:text-slate-400">12.5M</td>
+                                <td class="px-4 py-3 text-right">10.2M</td>
+                                <td class="px-4 py-3 text-right text-green-500 font-bold">82%</td>
+                            </tr>
+                            <tr class="border-b border-gray-100 dark:border-white/5">
+                                <td class="px-4 py-3 font-medium">Jakarta Barat</td>
+                                <td class="px-4 py-3 text-right text-slate-500 dark:text-slate-400">10.0M</td>
+                                <td class="px-4 py-3 text-right">6.5M</td>
+                                <td class="px-4 py-3 text-right text-yellow-500 font-bold">65%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- Table 2: Laporan Sator -->
+            <div
+                class="bg-white dark:bg-[#1C2630] rounded-xl overflow-hidden shadow-sm border border-gray-100 dark:border-white/5">
+                <div
+                    class="px-4 py-3 border-b border-gray-100 dark:border-white/5 flex items-center justify-between bg-gray-50 dark:bg-white/5">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Laporan
+                        Sator</h3>
+                    <span class="material-symbols-outlined text-slate-400 text-sm">visibility</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm whitespace-nowrap">
+                        <thead
+                            class="text-xs text-slate-500 dark:text-slate-400 border-b border-gray-100 dark:border-white/5">
+                            <tr>
+                                <th class="px-4 py-3 font-medium">Unit Name</th>
+                                <th class="px-4 py-3 font-medium">Manager</th>
+                                <th class="px-4 py-3 font-medium text-center">KPI</th>
+                                <th class="px-4 py-3 font-medium text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-slate-700 dark:text-slate-200">
+                            <tr class="border-b border-gray-100 dark:border-white/5">
+                                <td class="px-4 py-3 font-medium">Kebayoran 01</td>
+                                <td class="px-4 py-3 text-slate-500 dark:text-slate-400">Budi S.</td>
+                                <td class="px-4 py-3 text-center">4.8</td>
+                                <td class="px-4 py-3 text-center">
+                                    <span
+                                        class="inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-400 ring-1 ring-inset ring-green-600/20">On
+                                        Track</span>
+                                </td>
+                            </tr>
+                            <tr class="border-b border-gray-100 dark:border-white/5">
+                                <td class="px-4 py-3 font-medium">Palmerah 03</td>
+                                <td class="px-4 py-3 text-slate-500 dark:text-slate-400">Ani W.</td>
+                                <td class="px-4 py-3 text-center">3.2</td>
+                                <td class="px-4 py-3 text-center">
+                                    <span
+                                        class="inline-flex items-center rounded-full bg-red-100 dark:bg-red-900/30 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400 ring-1 ring-inset ring-red-600/20">Risk</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Sticky Footer Action -->
+    <div
+        class="fixed bottom-0 left-0 right-0 p-4 bg-background-light dark:bg-background-dark border-t border-gray-200 dark:border-white/10 z-40 pb-8">
+        <button
+            class="w-full bg-primary hover:bg-blue-600 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-500/20 active:scale-[0.98]">
+            <span class="material-symbols-outlined">download</span>
+            TARIK DATA
+        </button>
+    </div>
+</body>
+
+</html>
