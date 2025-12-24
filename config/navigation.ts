@@ -57,8 +57,8 @@ export const NAV_CONFIG: Record<UserRole, NavItem[]> = {
     ],
 
     // ============================================
-    // SPV (Supervisor) - 4 Menu Utama
-    // Dashboard, Harian, Tim (Performance + Underperform), Export
+    // SPV (Supervisor) - 5 Menu Utama
+    // Dashboard, Harian, Tim, SPC, Export
     // ============================================
     spv: [
         {
@@ -81,6 +81,13 @@ export const NAV_CONFIG: Record<UserRole, NavItem[]> = {
             icon: '👥',
             path: '/dashboard/team/performance',
             description: 'Performance & Underperform'
+        },
+        {
+            key: 'spc',
+            label: 'SPC',
+            icon: '🏪',
+            path: '/dashboard/spc',
+            description: 'Toko SPC Grup'
         },
         {
             key: 'export',
@@ -111,6 +118,13 @@ export const NAV_CONFIG: Record<UserRole, NavItem[]> = {
             description: 'Performance Promotor'
         },
         {
+            key: 'spc',
+            label: 'SPC',
+            icon: '🏪',
+            path: '/dashboard/spc',
+            description: 'Toko SPC Grup'
+        },
+        {
             key: 'report',
             label: 'Report',
             icon: '📋',
@@ -129,7 +143,7 @@ export const NAV_CONFIG: Record<UserRole, NavItem[]> = {
     // ============================================
     // MANAGER - Manager area
     // Fokus: BIG PICTURE seluruh area
-    // Menu: Dashboard, Tim (Performance + Underperform combined), Export
+    // Menu: Dashboard, Tim, SPC, Export
     // ============================================
     manager: [
         {
@@ -145,6 +159,13 @@ export const NAV_CONFIG: Record<UserRole, NavItem[]> = {
             icon: '👥',
             path: '/dashboard/area/performance',
             description: 'Performance & Underperform'
+        },
+        {
+            key: 'spc',
+            label: 'SPC',
+            icon: '🏪',
+            path: '/dashboard/spc',
+            description: 'Toko SPC Grup'
         },
         {
             key: 'export',

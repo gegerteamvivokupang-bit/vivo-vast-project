@@ -56,3 +56,5 @@ proxy.ts
 # SQL debug files
 check_data.sql
 check_targets_structure.sql
+
+.vercel

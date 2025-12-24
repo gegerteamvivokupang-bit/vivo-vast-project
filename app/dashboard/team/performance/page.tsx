@@ -336,7 +336,7 @@ export default function TeamPerformancePage() {
                             className={`flex-1 py-3 rounded-xl font-semibold text-sm transition-all ${mainTab === 'performance'
                                 ? 'bg-primary text-primary-foreground shadow-md'
                                 : 'bg-card text-muted-foreground shadow-md hover:bg-muted'
-                            }`}
+                                }`}
                         >
                             <div className="flex items-center justify-center gap-2">
                                 <span>📊</span>
@@ -351,7 +351,7 @@ export default function TeamPerformancePage() {
                             className={`flex-1 py-3 rounded-xl font-semibold text-sm transition-all ${mainTab === 'underperform'
                                 ? 'bg-destructive text-primary-foreground shadow-md'
                                 : 'bg-card text-muted-foreground shadow-md hover:bg-muted'
-                            }`}
+                                }`}
                         >
                             <div className="flex items-center justify-center gap-2">
                                 <span>📉</span>
@@ -387,7 +387,7 @@ export default function TeamPerformancePage() {
                             className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isCurrentMonth
                                 ? 'bg-muted text-muted-foreground cursor-not-allowed'
                                 : 'bg-muted text-muted-foreground hover:bg-muted active:scale-95'
-                            }`}
+                                }`}
                         >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -404,7 +404,7 @@ export default function TeamPerformancePage() {
                                 className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${selectedSator === 'all'
                                     ? 'bg-primary text-primary-foreground shadow-md'
                                     : 'bg-card text-muted-foreground shadow-md hover:bg-muted'
-                                }`}
+                                    }`}
                             >
                                 <div>Semua</div>
                                 <div className={`text-[10px] ${selectedSator === 'all' ? 'text-primary-foreground/80' : mainTab === 'underperform' ? 'text-destructive' : 'text-primary'}`}>
@@ -427,7 +427,7 @@ export default function TeamPerformancePage() {
                                         className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${selectedSator === sator.user_id
                                             ? 'bg-primary text-primary-foreground shadow-md'
                                             : 'bg-card text-muted-foreground shadow-md hover:bg-muted'
-                                        }`}
+                                            }`}
                                     >
                                         <div>{shortName}</div>
                                         <div className={`text-[10px] ${selectedSator === sator.user_id ? 'text-primary-foreground/80' : mainTab === 'underperform' ? 'text-destructive' : 'text-primary'}`}>
@@ -577,7 +577,7 @@ export default function TeamPerformancePage() {
                                 </div>
                             </div>
 
-                            {/* Underperform Promotor List */}
+                            {/* Underperform Promotor Table */}
                             {filteredUnderperform.length === 0 ? (
                                 <div className="bg-card rounded-xl shadow-md p-8 text-center">
                                     <div className="text-5xl mb-3">🎉</div>
@@ -591,57 +591,43 @@ export default function TeamPerformancePage() {
                                         <span className="text-primary-foreground/80 text-xs">{filteredUnderperform.length} orang</span>
                                     </div>
 
-                                    <div className="divide-y divide-border">
-                                        {filteredUnderperform.map((p) => {
-                                            const pct = getInputPercent(p);
-                                            const noTarget = !p.target || p.target === 0;
-                                            const kurang = Math.max(0, (p.target || 0) - p.total_input);
-
-                                            return (
-                                                <div key={p.user_id} className="px-4 py-3">
-                                                    {/* Row 1: Nama & Input */}
-                                                    <div className="flex justify-between items-center mb-1">
-                                                        <div>
-                                                            <span className="font-semibold text-foreground">{p.name}</span>
-                                                            {selectedSator === 'all' && p.sator_name && (
-                                                                <span className="ml-2 text-xs text-muted-foreground">({p.sator_name.split(' ')[0]})</span>
-                                                            )}
-                                                        </div>
-                                                        <span className="text-xl font-bold text-destructive">{p.total_input}</span>
-                                                    </div>
-
-                                                    {/* Row 2: Stats */}
-                                                    <div className="flex justify-between items-center text-xs mb-2">
-                                                        <div className="flex gap-3">
-                                                            <span className="text-muted-foreground">
-                                                                Target: <span className="font-medium">{noTarget ? '-' : p.target}</span>
-                                                            </span>
-                                                            <span className={pct >= timeGonePercent ? 'text-success' : 'text-destructive'}>
-                                                                {pct}%
-                                                            </span>
-                                                        </div>
-                                                        <span className="text-destructive font-medium">
-                                                            Kurang: {kurang}
-                                                        </span>
-                                                    </div>
-
-                                                    {/* Row 3: Detail */}
-                                                    <div className="flex gap-3 text-xs">
-                                                        <span className="text-success">{p.total_closed} ACC</span>
-                                                        <span className="text-warning">{p.total_pending} Pnd</span>
-                                                        <span className="text-destructive">{p.total_rejected} Rej</span>
-                                                    </div>
-
-                                                    {/* Progress Bar */}
-                                                    <div className="mt-2 w-full bg-muted rounded-full h-1.5 overflow-hidden">
-                                                        <div
-                                                            className="h-full rounded-full bg-destructive"
-                                                            style={{ width: `${Math.min(pct, 100)}%` }}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
+                                    {/* Table */}
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-xs">
+                                            <thead className="bg-muted/50">
+                                                <tr>
+                                                    <th className="sticky left-0 z-10 bg-muted/50 py-2 pl-3 pr-2 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground border-b border-border">Nama</th>
+                                                    <th className="whitespace-nowrap px-1.5 py-2 text-right text-[10px] font-bold uppercase tracking-wider text-muted-foreground border-b border-border">TGT</th>
+                                                    <th className="whitespace-nowrap px-1.5 py-2 text-right text-[10px] font-bold uppercase tracking-wider text-muted-foreground border-b border-border">INP</th>
+                                                    <th className="whitespace-nowrap px-1.5 py-2 text-right text-[10px] font-bold uppercase tracking-wider text-muted-foreground border-b border-border">%</th>
+                                                    <th className="whitespace-nowrap px-1.5 py-2 text-right text-[10px] font-bold uppercase tracking-wider text-muted-foreground border-b border-border">GAP</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-border">
+                                                {filteredUnderperform.map((p) => {
+                                                    const pct = getInputPercent(p);
+                                                    const gap = Math.max(0, (p.target || 0) - p.total_input);
+                                                    const firstName = p.name.split(' ')[0];
+                                                    return (
+                                                        <tr key={p.user_id} className="bg-red-500/10 hover:bg-red-500/15">
+                                                            <td className="sticky left-0 z-10 bg-background py-2 pl-3 pr-2 font-medium text-xs">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span className="w-3 h-3 text-red-500">⚠️</span>
+                                                                    <span className="truncate">{firstName}</span>
+                                                                </div>
+                                                                {selectedSator === 'all' && p.sator_name && (
+                                                                    <div className="text-[10px] text-muted-foreground mt-0.5">{p.sator_name.split(' ')[0]}</div>
+                                                                )}
+                                                            </td>
+                                                            <td className="whitespace-nowrap px-1.5 py-2 text-right text-muted-foreground font-mono text-[11px]">{p.target || 0}</td>
+                                                            <td className="whitespace-nowrap px-1.5 py-2 text-right text-muted-foreground font-mono text-[11px]">{p.total_input}</td>
+                                                            <td className="whitespace-nowrap px-1.5 py-2 text-right text-red-500 font-bold font-mono text-[11px]">{pct}%</td>
+                                                            <td className="whitespace-nowrap px-1.5 py-2 text-right text-red-500 font-bold font-mono text-[11px]">-{gap}</td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
                             )}

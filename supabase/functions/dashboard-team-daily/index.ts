@@ -17,10 +17,12 @@ Deno.serve(async (req) => {
 
     try {
         let userId: string | null = null
+        let requestDate: string | null = null
 
         if (req.method === 'POST') {
             const body = await req.json()
             userId = body.userId
+            requestDate = body.date // Format: "2024-12-24"
         }
 
         if (!userId) {
@@ -36,12 +38,15 @@ Deno.serve(async (req) => {
         )
 
         // Fix Timezone: Use WITA (Asia/Makassar)
-        const today = new Intl.DateTimeFormat('en-CA', {
+        const witaDate = new Intl.DateTimeFormat('en-CA', {
             timeZone: 'Asia/Makassar',
             year: 'numeric',
             month: '2-digit',
             day: '2-digit'
         }).format(new Date());
+
+        // Use requested date or fallback to today in WITA
+        const today = requestDate || witaDate;
 
         console.log('Team Daily - userId:', userId, 'date:', today);
 

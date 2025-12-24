@@ -171,69 +171,76 @@ export default function ManagerUnderperformPage() {
                     </div>
                 </div>
 
-                {/* List Section */}
-                <div className="flex-1 flex flex-col gap-3 px-4 pb-24">
+                {/* Table Section */}
+                <div className="flex-1 px-4 pb-24">
                     {currentData.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-12 gap-4 text-center">
+                        <div className="flex flex-col items-center justify-center py-12 gap-4 text-center bg-card rounded-2xl border border-dashed border-border">
                             <div className="bg-emerald-500/10 p-6 rounded-full">
                                 <span className="text-4xl">🎉</span>
                             </div>
                             <div>
-                                <h3 className="text-lg font-bold">All Clear!</h3>
-                                <p className="text-muted-foreground">Tidak ada yang underperform!</p>
+                                <h3 className="text-lg font-bold text-foreground">All Clear!</h3>
+                                <p className="text-muted-foreground text-sm">Tidak ada yang underperform di level ini.</p>
                             </div>
                         </div>
                     ) : (
-                        currentData.map((m, i) => {
-                            const pct = m.target > 0 ? Math.round((m.total_input / m.target) * 100) : 0;
-                            const gap = m.target - m.total_input;
+                        <div className="bg-card rounded-2xl border border-border shadow-xl overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-muted/50 border-b border-border">
+                                            <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Unit / Area</th>
+                                            <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground text-center">Input / TGT</th>
+                                            <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground text-center">GAP</th>
+                                            <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground text-right">%</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border">
+                                        {[...currentData]
+                                            .sort((a, b) => (b.target - b.total_input) - (a.target - a.total_input))
+                                            .map((m, i) => {
+                                                const pct = m.target > 0 ? Math.round((m.total_input / m.target) * 100) : 0;
+                                                const gap = Math.max(0, m.target - m.total_input);
+                                                const isCritical = gap >= 10; // Contoh logic priority
 
-                            return (
-                                <div
-                                    key={i}
-                                    className="flex flex-col gap-3 rounded-xl border border-alert/30 bg-alert-bg p-4 relative overflow-hidden"
-                                >
-                                    {/* Red sidebar accent */}
-                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-alert" />
-
-                                    <div className="flex items-start justify-between gap-4 pl-2">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-12 h-12 rounded-full bg-primary/20 border-2 border-alert flex items-center justify-center text-foreground font-bold text-sm">
-                                                {getInitials(m.name)}
-                                            </div>
-                                            <div>
-                                                <h4 className="font-bold text-base">{m.name}</h4>
-                                                {m.area && <p className="text-muted-foreground text-xs mt-0.5">Area: {m.area}</p>}
-                                            </div>
-                                        </div>
-                                        <div className="flex flex-col items-end">
-                                            <span className="text-alert font-bold text-lg">-{gap} GAP</span>
-                                            <div className="flex items-center gap-1 text-alert text-xs font-medium bg-black/10 px-1.5 py-0.5 rounded">
-                                                <TrendingDown className="w-3 h-3" />
-                                                {pct}%
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Metrics Grid */}
-                                    <div className="grid grid-cols-2 gap-2 pl-2 border-t border-alert/20 pt-3 mt-1">
-                                        <div className="flex flex-col">
-                                            <span className="text-[10px] font-semibold text-muted-foreground uppercase">Target (TGT)</span>
-                                            <span className="font-mono font-medium">{m.target || 0}</span>
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <span className="text-[10px] font-semibold text-muted-foreground uppercase">Input (INP)</span>
-                                            <span className="font-mono font-medium">{m.total_input}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })
-                    )}
-
-                    {currentData.length > 0 && (
-                        <div className="mt-4 flex justify-center">
-                            <p className="text-xs text-muted-foreground">End of list</p>
+                                                return (
+                                                    <tr key={i} className="group hover:bg-muted/30 transition-colors">
+                                                        <td className="px-4 py-4">
+                                                            <div className="font-bold text-foreground leading-tight">{m.name}</div>
+                                                            {m.area && <div className="text-[10px] text-muted-foreground font-medium uppercase mt-0.5">{m.area}</div>}
+                                                        </td>
+                                                        <td className="px-4 py-4 text-center">
+                                                            <div className="text-sm font-bold text-foreground">{m.total_input}</div>
+                                                            <div className="text-[10px] text-muted-foreground">dari {m.target}</div>
+                                                        </td>
+                                                        <td className="px-4 py-4 text-center">
+                                                            <div className={cn(
+                                                                "inline-flex items-center px-2 py-1 rounded-lg font-black text-sm",
+                                                                isCritical ? "bg-red-500 text-white shadow-sm" : "bg-red-100 text-red-600"
+                                                            )}>
+                                                                -{gap}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-4 text-right">
+                                                            <div className={cn(
+                                                                "text-sm font-black",
+                                                                pct < 30 ? "text-red-600" : "text-amber-600"
+                                                            )}>
+                                                                {pct}%
+                                                            </div>
+                                                            <div className="mt-1.5 w-16 ml-auto bg-muted rounded-full h-1 overflow-hidden">
+                                                                <div
+                                                                    className={cn("h-full rounded-full", pct < 30 ? "bg-red-500" : "bg-amber-500")}
+                                                                    style={{ width: `${Math.min(pct, 100)}%` }}
+                                                                />
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     )}
                 </div>

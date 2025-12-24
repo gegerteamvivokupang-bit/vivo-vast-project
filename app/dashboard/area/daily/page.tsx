@@ -8,6 +8,8 @@ import { Loading } from '@/components/ui/loading';
 import { Alert } from '@/components/ui/alert';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/utils/format';
+import { cn } from '@/lib/utils';
+import { ChevronRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
 interface Promotor {
@@ -342,84 +344,112 @@ export default function ManagerDailyPage() {
 
                     {/* Areas List */}
                     {filteredAreas.length === 0 ? (
-                        <div className="bg-card rounded-xl p-6 text-center shadow-md">
-                            <div className="text-3xl mb-2">
+                        <div className="bg-card rounded-2xl p-12 text-center shadow-xl border border-dashed border-border">
+                            <div className="text-5xl mb-4">
                                 {filter === 'empty' ? '🎉' : filter === 'reject' ? '✅' : '📭'}
                             </div>
-                            <p className="text-muted-foreground text-sm">
+                            <h3 className="text-lg font-bold text-foreground">
                                 {filter === 'empty' ? 'Semua sudah input!' : filter === 'reject' ? 'Tidak ada reject' : 'Belum ada data'}
-                            </p>
+                            </h3>
+                            <p className="text-muted-foreground text-sm mt-1">Data harian tidak ditemukan untuk filter ini.</p>
                         </div>
                     ) : (
-                        <div className="space-y-2">
+                        <div className="space-y-4">
                             {filteredAreas.map((area) => (
-                                <div key={area.user_id} className="bg-card rounded-xl shadow-md overflow-hidden">
-                                    {/* Area Header - Compact */}
-                                    <div className="bg-success px-3 py-2">
-                                        <div className="flex justify-between items-center">
-                                            <div>
-                                                <span className="text-primary-foreground font-semibold text-sm">{area.area_name}</span>
-                                                <span className="text-primary-foreground/80 text-[10px] ml-2">SPV: {area.spv_name}</span>
+                                <div key={area.user_id} className="bg-card rounded-2xl shadow-xl overflow-hidden border border-border">
+                                    {/* Area Header - Premium Style */}
+                                    <div className="bg-primary px-5 py-4">
+                                        <div className="flex justify-between items-center text-white">
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] font-bold uppercase tracking-widest opacity-80">Region Area</span>
+                                                <span className="text-lg font-black">{area.area_name}</span>
                                             </div>
-                                            <div className="flex items-center gap-2 text-[10px] text-primary-foreground/80">
-                                                <span>{area.total_closed}c</span>
-                                                <span>{area.total_pending}p</span>
-                                                <span>{area.total_rejected}r</span>
-                                                <span className="text-primary-foreground font-bold text-sm ml-1">{area.total_input}</span>
+                                            <div className="text-right">
+                                                <span className="text-3xl font-black leading-none">{area.total_input}</span>
+                                                <div className="text-[9px] font-bold uppercase opacity-80 mt-1">INPUT HARI INI</div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Sators & Promotors */}
-                                    <div className="p-2">
-                                        {area.sators.map((sator, satorIdx) => (
-                                            <div key={sator.user_id} className={satorIdx > 0 ? 'mt-2 pt-2 border-t border-border' : ''}>
-                                                {/* Sator Header */}
-                                                <div className="flex justify-between items-center px-2 py-1 mb-1">
-                                                    <span className="text-foreground font-medium text-[11px]">{sator.name}</span>
-                                                    <span className="text-primary font-semibold text-xs">{sator.total_input}</span>
+                                    {/* Sators & Promotors Table-style List */}
+                                    <div className="divide-y divide-border">
+                                        {area.sators.map((sator) => (
+                                            <div key={sator.user_id} className="p-0">
+                                                {/* Sator Sub-Header - Bolder & Clearer */}
+                                                <div className="bg-muted px-5 py-3 flex justify-between items-center border-b border-border shadow-sm">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-1 h-4 bg-primary rounded-full" />
+                                                        <span className="text-[11px] font-black text-foreground uppercase tracking-widest">SATOR: {sator.name}</span>
+                                                    </div>
+                                                    <div className="bg-primary/10 text-primary px-3 py-1 rounded-full text-[10px] font-extrabold border border-primary/20">
+                                                        {sator.total_input} TOTAL INPUT
+                                                    </div>
                                                 </div>
 
-                                                {/* Promotors Grid */}
-                                                <div className="grid gap-1">
-                                                    {sator.promotors.map((promotor) => (
-                                                        <button
-                                                            key={promotor.user_id}
-                                                            onClick={() => openPromotorDetail(promotor)}
-                                                            className={`w-full text-left px-2.5 py-2 rounded-xl transition-all active:scale-[0.98] ${promotor.is_empty
-                                                                ? 'bg-destructive/10 border border-destructive/30'
-                                                                : promotor.has_reject
-                                                                    ? 'bg-warning/10 border border-warning/30'
-                                                                    : 'bg-muted border border-border'
-                                                                }`}
-                                                        >
-                                                            <div className="flex justify-between items-center">
-                                                                <div className="flex items-center gap-2 min-w-0 flex-1">
-                                                                    <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${promotor.is_empty ? 'bg-destructive' : promotor.has_reject ? 'bg-warning' : 'bg-success'
-                                                                        }`}></div>
-                                                                    <span className={`text-[11px] truncate ${promotor.is_empty ? 'text-destructive' : 'text-foreground'
-                                                                        }`}>
-                                                                        {promotor.name}
-                                                                    </span>
+                                                {/* Promotors Rows */}
+                                                <div className="divide-y divide-border/50">
+                                                    {[...sator.promotors]
+                                                        .sort((a, b) => b.total_input - a.total_input)
+                                                        .map((promotor) => (
+                                                            <div
+                                                                key={promotor.user_id}
+                                                                onClick={() => openPromotorDetail(promotor)}
+                                                                className={cn(
+                                                                    "px-5 py-4 flex items-center justify-between cursor-pointer transition-all hover:bg-muted/30 active:scale-[0.99]",
+                                                                    promotor.is_empty ? "bg-red-50/20" : ""
+                                                                )}
+                                                            >
+                                                                {/* Col 1: Name & Status */}
+                                                                <div className="flex flex-col min-w-0 flex-1">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className={cn(
+                                                                            "w-2 h-2 rounded-full shrink-0",
+                                                                            promotor.is_empty ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" :
+                                                                                promotor.has_reject ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "bg-emerald-500"
+                                                                        )} />
+                                                                        <span className={cn(
+                                                                            "font-bold text-sm truncate",
+                                                                            promotor.is_empty ? "text-red-600" : "text-foreground"
+                                                                        )}>
+                                                                            {promotor.name}
+                                                                        </span>
+                                                                    </div>
+                                                                    <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider mt-0.5 pl-4">PROMOTOR</span>
                                                                 </div>
-                                                                <div className="flex items-center gap-1.5 flex-shrink-0">
-                                                                    {promotor.is_empty ? (
-                                                                        <span className="text-[10px] text-destructive">KOSONG</span>
-                                                                    ) : (
-                                                                        <>
-                                                                            <span className="text-[9px] text-muted-foreground">
-                                                                                {promotor.total_closed}c {promotor.total_pending}p {promotor.total_rejected}r
-                                                                            </span>
-                                                                            <span className="text-xs font-semibold text-primary">{promotor.total_input}</span>
-                                                                        </>
-                                                                    )}
-                                                                    <svg className="w-3 h-3 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                                                    </svg>
+
+                                                                {/* Col 2: Breakdown Grid (Small Icons) */}
+                                                                {!promotor.is_empty && (
+                                                                    <div className="flex items-center gap-3 px-4">
+                                                                        <div className="flex flex-col items-center">
+                                                                            <span className="text-[10px] font-bold text-emerald-500">{promotor.total_closed}</span>
+                                                                            <span className="text-[8px] font-bold text-muted-foreground uppercase">CLS</span>
+                                                                        </div>
+                                                                        <div className="flex flex-col items-center">
+                                                                            <span className="text-[10px] font-bold text-amber-500">{promotor.total_pending}</span>
+                                                                            <span className="text-[8px] font-bold text-muted-foreground uppercase">PND</span>
+                                                                        </div>
+                                                                        <div className="flex flex-col items-center">
+                                                                            <span className="text-[10px] font-bold text-red-500">{promotor.total_rejected}</span>
+                                                                            <span className="text-[8px] font-bold text-muted-foreground uppercase">REJ</span>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+
+                                                                {/* Col 3: Total & Chevron */}
+                                                                <div className="flex items-center gap-3 text-right">
+                                                                    <div className="flex flex-col items-end">
+                                                                        <span className={cn(
+                                                                            "text-xl font-black leading-none",
+                                                                            promotor.is_empty ? "text-red-500 opacity-50" : "text-primary"
+                                                                        )}>
+                                                                            {promotor.total_input}
+                                                                        </span>
+                                                                        <span className="text-[8px] font-bold text-muted-foreground uppercase mt-1">TOTAL</span>
+                                                                    </div>
+                                                                    <ChevronRight className="w-4 h-4 text-muted-foreground opacity-30" />
                                                                 </div>
                                                             </div>
-                                                        </button>
-                                                    ))}
+                                                        ))}
                                                 </div>
                                             </div>
                                         ))}
@@ -428,6 +458,7 @@ export default function ManagerDailyPage() {
                             ))}
                         </div>
                     )}
+
                 </div>
 
                 {/* Modal Popup */}
@@ -576,7 +607,7 @@ export default function ManagerDailyPage() {
                             {/* Status Badge */}
                             <div className="flex justify-center">
                                 <div className={`px-4 py-2 rounded-full text-sm font-bold ${selectedSubmission.status?.toLowerCase() === 'acc' ? 'bg-primary/20 text-success' :
-                                        selectedSubmission.status?.toLowerCase() === 'pending' ? 'bg-warning/20 text-warning' : 'bg-destructive/20 text-destructive'
+                                    selectedSubmission.status?.toLowerCase() === 'pending' ? 'bg-warning/20 text-warning' : 'bg-destructive/20 text-destructive'
                                     }`}>
                                     {selectedSubmission.status?.toUpperCase()}
                                 </div>

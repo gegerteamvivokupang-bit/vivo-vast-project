@@ -85,8 +85,11 @@ export default function ManagerDashboardPage() {
 
     const totals = areas.reduce((acc, a) => ({
         total_input: acc.total_input + a.total_input,
+        total_pending: acc.total_pending + a.total_pending,
+        total_rejected: acc.total_rejected + a.total_rejected,
+        total_closed: acc.total_closed + a.total_closed,
         target: acc.target + a.target,
-    }), { total_input: 0, target: 0 });
+    }), { total_input: 0, total_pending: 0, total_rejected: 0, total_closed: 0, target: 0 });
 
     const totalPercent = totals.target > 0 ? Math.round((totals.total_input / totals.target) * 100) : 0;
 
@@ -138,9 +141,6 @@ export default function ManagerDashboardPage() {
                                 <span className="text-white text-lg font-bold leading-tight">{user?.name || 'Manager'}</span>
                             </div>
                         </button>
-                        <button className="flex items-center justify-center h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white">
-                            <Bell className="w-5 h-5" />
-                        </button>
                     </div>
 
                     {/* Date & Time Status Row */}
@@ -166,11 +166,13 @@ export default function ManagerDashboardPage() {
                 </div>
 
                 {/* Main Content Container */}
-                <div className="flex-1 px-5 -mt-6 relative z-20 flex flex-col gap-6">
-                    {/* Hero Metric Card (Progress Hari Ini) */}
+                <div className="flex-1 px-5 -mt-6 relative z-20 flex flex-col gap-5">
+
+
+                    {/* Progress Hari Ini (Donut) - Paling Atas sesuai request */}
                     <button
                         onClick={() => router.push('/dashboard/area/daily')}
-                        className="bg-card rounded-2xl shadow-xl p-5 border border-border text-left"
+                        className="bg-card rounded-2xl shadow-xl p-5 border border-border text-left hover:border-primary/30 transition-all"
                     >
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="text-foreground text-lg font-bold flex items-center gap-2">
@@ -200,17 +202,17 @@ export default function ManagerDashboardPage() {
                                 </div>
 
                                 {/* Metrics Breakdown Pills */}
-                                <div className="flex flex-wrap justify-center gap-3 w-full">
-                                    <div className="flex-1 min-w-[90px] bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 flex flex-col items-center justify-center text-center">
-                                        <span className="text-emerald-500 text-xs font-bold mb-1">Closing</span>
+                                <div className="grid grid-cols-3 gap-3 w-full">
+                                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 flex flex-col items-center justify-center text-center">
+                                        <span className="text-emerald-500 text-xs font-bold mb-1 uppercase">Closing</span>
                                         <span className="text-foreground font-bold text-lg">{dailyData.total_closed}</span>
                                     </div>
-                                    <div className="flex-1 min-w-[90px] bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex flex-col items-center justify-center text-center">
-                                        <span className="text-amber-500 text-xs font-bold mb-1">Pending</span>
+                                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex flex-col items-center justify-center text-center">
+                                        <span className="text-amber-500 text-xs font-bold mb-1 uppercase">Pending</span>
                                         <span className="text-foreground font-bold text-lg">{dailyData.total_pending}</span>
                                     </div>
-                                    <div className="flex-1 min-w-[90px] bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex flex-col items-center justify-center text-center">
-                                        <span className="text-red-500 text-xs font-bold mb-1">Reject</span>
+                                    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex flex-col items-center justify-center text-center">
+                                        <span className="text-red-500 text-xs font-bold mb-1 uppercase">Reject</span>
                                         <span className="text-foreground font-bold text-lg">{dailyData.total_rejected}</span>
                                     </div>
                                 </div>
@@ -218,79 +220,140 @@ export default function ManagerDashboardPage() {
                         )}
                     </button>
 
-                    {/* Area Performance Grid */}
+                    {/* Target Bulanan Card - Sesuai request di posisi kedua */}
+                    <div className="bg-card border border-border rounded-2xl p-5 shadow-xl">
+                        <div className="flex items-center gap-2 mb-4">
+                            <span className="text-xl">🎯</span>
+                            <h3 className="font-bold text-foreground">TARGET BULAN INI</h3>
+                        </div>
+
+                        <div className="flex justify-between items-end mb-3">
+                            <div>
+                                <span className="text-4xl font-bold text-primary">{totals.total_input}</span>
+                                <span className="text-muted-foreground text-lg"> / {totals.target}</span>
+                            </div>
+                            <div className={cn(
+                                "text-2xl font-bold",
+                                totalPercent >= 100 ? 'text-emerald-500' :
+                                    totalPercent >= timeGonePercent ? 'text-amber-500' : 'text-red-500'
+                            )}>
+                                {totalPercent}%
+                            </div>
+                        </div>
+
+                        <div className="w-full bg-muted rounded-full h-3 overflow-hidden mb-4">
+                            <div
+                                className={cn(
+                                    "h-full rounded-full transition-all duration-500",
+                                    totalPercent >= 100 ? 'bg-emerald-500' :
+                                        totalPercent >= timeGonePercent ? 'bg-amber-500' : 'bg-red-500'
+                                )}
+                                style={{ width: `${Math.min(totalPercent, 100)}%` }}
+                            />
+                        </div>
+
+                        {/* Stats Grid 4 Kolom ala SPV */}
+                        <div className="grid grid-cols-4 gap-2">
+                            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-2 text-center">
+                                <div className="text-emerald-600 text-lg font-bold">{totals.total_closed}</div>
+                                <div className="text-[10px] text-emerald-600 font-medium">CLOSING</div>
+                            </div>
+                            <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-2 text-center">
+                                <div className="text-amber-600 text-lg font-bold">{totals.total_pending}</div>
+                                <div className="text-[10px] text-amber-600 font-medium">PENDING</div>
+                            </div>
+                            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-2 text-center">
+                                <div className="text-red-600 text-lg font-bold">{totals.total_rejected}</div>
+                                <div className="text-[10px] text-red-600 font-medium">REJECT</div>
+                            </div>
+                            <div className="bg-primary/10 border border-primary/20 rounded-xl p-2 text-center">
+                                <div className="text-primary text-lg font-bold">{totals.total_closed}</div>
+                                <div className="text-[10px] text-primary font-medium">ACC</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Area Performance List - Posisi Ketiga */}
                     <div>
-                        <div className="flex items-center justify-between mb-4 px-1">
-                            <h3 className="text-foreground text-lg font-bold">Area Performance</h3>
+                        <div className="flex items-center justify-between mb-3 px-1">
+                            <h3 className="text-foreground text-lg font-bold uppercase tracking-tight">Performa Per Area</h3>
                             <button
                                 onClick={() => router.push('/dashboard/area/performance')}
-                                className="text-primary text-sm font-semibold hover:underline"
+                                className="text-primary text-xs font-bold hover:underline"
                             >
-                                View Detail
+                                DETAIL TIM →
                             </button>
                         </div>
 
                         {areas.length === 0 ? (
-                            <div className="text-center text-muted-foreground py-8 bg-card rounded-xl border border-border">
-                                Tidak ada data AREA
+                            <div className="text-center text-muted-foreground py-10 bg-card rounded-2xl border border-border dashed">
+                                Belum ada data area
                             </div>
                         ) : (
-                            <div className="grid grid-cols-2 gap-4">
-                                {areas.map((area, idx) => {
-                                    const pct = area.target > 0 ? Math.round((area.total_input / area.target) * 100) : 0;
+                            <div className="bg-card border border-border rounded-2xl shadow-xl overflow-hidden">
+                                <div className="divide-y divide-border">
+                                    {areas.map((area, idx) => {
+                                        const pct = area.target > 0 ? Math.round((area.total_input / area.target) * 100) : 0;
+                                        const gap = Math.max(0, area.target - area.total_input);
 
-                                    return (
-                                        <div
-                                            key={idx}
-                                            className="bg-card rounded-xl p-4 shadow-sm border border-border flex flex-col justify-between group cursor-pointer hover:border-primary/50 transition-all"
-                                        >
-                                            <div className="flex justify-between items-start mb-3">
-                                                <div className="flex flex-col">
-                                                    <span className="text-foreground text-base font-bold">{area.name}</span>
-                                                    <span className="text-muted-foreground text-xs">{area.spv_name}</span>
+                                        return (
+                                            <div
+                                                key={idx}
+                                                className="px-5 py-5 group hover:bg-muted/30 transition-all cursor-pointer"
+                                                onClick={() => router.push('/dashboard/area/performance')}
+                                            >
+                                                {/* Row 1: Area Name & Total Input */}
+                                                <div className="flex justify-between items-center mb-1">
+                                                    <div>
+                                                        <h4 className="text-lg font-bold text-foreground leading-tight">{area.name}</h4>
+                                                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">{area.spv_name}</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="text-3xl font-black text-primary leading-none">{area.total_input}</span>
+                                                        <p className="text-[9px] text-muted-foreground font-bold uppercase leading-none mt-1">TOTAL INPUT</p>
+                                                    </div>
+                                                </div>
+
+                                                {/* Row 2: Progress Metrics */}
+                                                <div className="flex justify-between items-center text-xs mb-3">
+                                                    <div className="flex gap-3">
+                                                        <span className="text-muted-foreground text-[10px]">
+                                                            Target: <span className="font-bold text-foreground">{area.target}</span>
+                                                        </span>
+                                                        <span className={cn(
+                                                            "font-bold text-[10px]",
+                                                            pct >= 100 ? 'text-emerald-500' :
+                                                                pct >= timeGonePercent ? 'text-amber-500' : 'text-red-500'
+                                                        )}>
+                                                            {pct}%
+                                                        </span>
+                                                    </div>
+                                                    {gap > 0 ? (
+                                                        <span className="text-red-500 font-bold text-[10px]">Gap: -{gap}</span>
+                                                    ) : (
+                                                        <span className="text-emerald-500 font-bold text-[10px]">DONE!</span>
+                                                    )}
+                                                </div>
+
+                                                {/* Row 3: Progress Bar */}
+                                                <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                                                    <div
+                                                        className={cn(
+                                                            "h-full rounded-full transition-all duration-500",
+                                                            pct >= 100 ? 'bg-emerald-500' :
+                                                                pct >= timeGonePercent ? 'bg-amber-500' : 'bg-red-500'
+                                                        )}
+                                                        style={{ width: `${Math.min(pct, 100)}%` }}
+                                                    />
                                                 </div>
                                             </div>
-
-                                            {/* Target & Input */}
-                                            <div className="flex items-baseline gap-2 mb-2">
-                                                <span className="text-muted-foreground text-xs">TGT:</span>
-                                                <span className="text-foreground text-sm font-semibold">{area.target || 0}</span>
-                                                <span className="text-muted-foreground text-xs mx-1">•</span>
-                                                <span className="text-muted-foreground text-xs">INP:</span>
-                                                <span className="text-primary text-sm font-bold">{area.total_input}</span>
-                                            </div>
-
-                                            {/* Progress Bar */}
-                                            <div className="mb-3">
-                                                <div className="flex items-center justify-between mb-1">
-                                                    <span className={cn("text-2xl font-bold", getStatusColor(pct))}>{pct}%</span>
-                                                </div>
-                                                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                                                    <div className={cn("h-full rounded-full", getStatusBg(pct))} style={{ width: `${Math.min(pct, 100)}%` }} />
-                                                </div>
-                                            </div>
-
-                                            {/* Metrics Pills */}
-                                            <div className="flex gap-1.5 text-xs">
-                                                <div className="flex-1 bg-emerald-500/10 rounded px-2 py-1 text-center">
-                                                    <div className="font-bold text-emerald-500">{area.total_closed}</div>
-                                                    <div className="text-[9px] text-muted-foreground">CLS</div>
-                                                </div>
-                                                <div className="flex-1 bg-amber-500/10 rounded px-2 py-1 text-center">
-                                                    <div className="font-bold text-amber-500">{area.total_pending}</div>
-                                                    <div className="text-[9px] text-muted-foreground">PND</div>
-                                                </div>
-                                                <div className="flex-1 bg-red-500/10 rounded px-2 py-1 text-center">
-                                                    <div className="font-bold text-red-500">{area.total_rejected}</div>
-                                                    <div className="text-[9px] text-muted-foreground">REJ</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    })}
+                                </div>
                             </div>
                         )}
                     </div>
+
 
                     {/* Bottom Spacer */}
                     <div className="h-10" />

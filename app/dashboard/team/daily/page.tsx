@@ -8,6 +8,8 @@ import { Loading } from '@/components/ui/loading';
 import { Alert } from '@/components/ui/alert';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
+import { Calendar, Check, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface Sator {
     user_id: string;
@@ -59,12 +61,27 @@ export default function SpvDailyPage() {
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
 
+    // Date filter
+    const [showDatePicker, setShowDatePicker] = useState(false);
     const now = new Date();
-    const todayLabel = now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const todayStr = now.toISOString().split('T')[0];
+    const [selectedDate, setSelectedDate] = useState(todayStr);
+
+    // Generate date options (last 7 days)
+    const dateOptions = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        const value = d.toISOString().split('T')[0];
+        const label = i === 0 ? 'Hari Ini' : i === 1 ? 'Kemarin' : d.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' });
+        return { value, label };
+    });
+
+    const selectedDateLabel = dateOptions.find(d => d.value === selectedDate)?.label ||
+        new Date(selectedDate).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' });
 
     useEffect(() => {
         if (user) fetchData();
-    }, [user]);
+    }, [user, selectedDate]);
 
     const fetchData = async () => {
         setLoading(true);
@@ -84,7 +101,7 @@ export default function SpvDailyPage() {
 
             // Fetch daily data from Edge Function (includes promotors and sators)
             const { data, error } = await supabase.functions.invoke('dashboard-team-daily', {
-                body: { userId: user?.id }
+                body: { userId: user?.id, date: selectedDate }
             });
 
             if (error) throw error;
@@ -119,13 +136,12 @@ export default function SpvDailyPage() {
 
         try {
             const supabase = createClient();
-            const today = now.toISOString().split('T')[0];
 
             // Use Edge Function to bypass RLS
             const { data, error } = await supabase.functions.invoke('promotor-submissions', {
                 body: {
                     promotorId: promotor.promoter_user_id,
-                    date: today
+                    date: selectedDate
                 }
             });
 
@@ -194,12 +210,69 @@ export default function SpvDailyPage() {
 
                 <SpvHeader
                     title="PROGRESS HARIAN"
-                    subtitle={todayLabel}
+                    subtitle={selectedDateLabel}
                     icon="📊"
                     backUrl="/dashboard/team"
                 />
 
                 <div className="p-3">
+                    {/* Date Filter Button */}
+                    <button
+                        onClick={() => setShowDatePicker(true)}
+                        className="w-full flex items-center gap-3 bg-card border border-border rounded-xl px-4 py-3 mb-3 shadow-sm active:scale-[0.98] transition-all"
+                    >
+                        <Calendar className="w-5 h-5 text-primary shrink-0" />
+                        <span className="flex-1 text-left text-foreground text-sm font-bold">
+                            {selectedDateLabel}
+                        </span>
+                        <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+
+                    {/* Bottom Sheet Date Picker */}
+                    {showDatePicker && (
+                        <div className="fixed inset-0 z-50 flex items-end justify-center">
+                            {/* Backdrop */}
+                            <div
+                                className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                                onClick={() => setShowDatePicker(false)}
+                            />
+                            {/* Sheet */}
+                            <div className="relative w-full max-w-lg bg-card rounded-t-3xl p-5 pb-24 mb-16 animate-in slide-in-from-bottom duration-300">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-lg font-bold text-foreground">Pilih Tanggal</h3>
+                                    <button
+                                        onClick={() => setShowDatePicker(false)}
+                                        className="p-2 rounded-full hover:bg-muted"
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
+                                <div className="space-y-2">
+                                    {dateOptions.map(opt => (
+                                        <button
+                                            key={opt.value}
+                                            onClick={() => {
+                                                setSelectedDate(opt.value);
+                                                setShowDatePicker(false);
+                                            }}
+                                            className={cn(
+                                                "w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors",
+                                                selectedDate === opt.value
+                                                    ? "bg-primary text-primary-foreground"
+                                                    : "bg-muted hover:bg-muted/80 text-foreground"
+                                            )}
+                                        >
+                                            <span className="font-medium">{opt.label}</span>
+                                            {selectedDate === opt.value && <Check className="w-5 h-5" />}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Summary Card - Compact */}
                     <div className="bg-primary rounded-xl p-4 mb-3 shadow-md">
                         <div className="flex items-center justify-between mb-3">

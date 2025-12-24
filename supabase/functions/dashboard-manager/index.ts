@@ -21,14 +21,27 @@ Deno.serve(async (req) => {
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         )
 
-        // Get current month in WITA
+        // Parse request body untuk dapat month parameter
+        let requestMonth = null;
+        try {
+            const body = await req.json();
+            requestMonth = body?.month; // Format: "2024-12" 
+        } catch {
+            // No body, use current month
+        }
+
+        // Get current month in WITA (fallback)
         const witaDate = new Intl.DateTimeFormat('en-CA', {
             timeZone: 'Asia/Makassar',
             year: 'numeric',
             month: '2-digit',
             day: '2-digit'
         }).format(new Date());
-        const currentMonth = witaDate.substring(0, 7) + '-01';
+
+        // Use requested month or fallback to current
+        const currentMonth = requestMonth
+            ? `${requestMonth}-01`  // "2024-12" -> "2024-12-01"
+            : witaDate.substring(0, 7) + '-01';
 
         console.log('Manager Dashboard - Fetching all data for month:', currentMonth);
 

@@ -10,7 +10,7 @@ import { Alert } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
-import { Bell, User, ChevronRight } from 'lucide-react';
+import { User, ChevronRight } from 'lucide-react';
 
 interface MonthlySummary {
     target: number;
@@ -193,9 +193,7 @@ export default function SpvDashboardPage() {
                                 <span className="text-white text-lg font-bold leading-tight">{user?.name || 'User'}</span>
                             </div>
                         </button>
-                        <button className="flex items-center justify-center h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white">
-                            <Bell className="w-5 h-5" />
-                        </button>
+
                     </div>
 
                     {/* Date & Time Status Row */}
@@ -222,7 +220,7 @@ export default function SpvDashboardPage() {
 
                 {/* Main Content Container */}
                 <div className="flex-1 px-5 -mt-6 relative z-20 flex flex-col gap-4">
-                    {/* Target Bulanan Card */}
+                    {/* Target Bulanan Card - Dengan Stats */}
                     <div className="bg-card border border-border rounded-2xl p-5 shadow-xl">
                         <div className="flex items-center gap-2 mb-4">
                             <span className="text-xl">🎯</span>
@@ -237,36 +235,48 @@ export default function SpvDashboardPage() {
                             <div className={cn(
                                 "text-2xl font-bold",
                                 targetPercent >= 100 ? 'text-emerald-500' :
-                                targetPercent >= timeGonePercent ? 'text-amber-500' : 'text-red-500'
+                                    targetPercent >= timeGonePercent ? 'text-amber-500' : 'text-red-500'
                             )}>
                                 {targetPercent}%
                             </div>
                         </div>
 
-                        <div className="w-full bg-muted rounded-full h-3 overflow-hidden mb-3">
+                        <div className="w-full bg-muted rounded-full h-3 overflow-hidden mb-4">
                             <div
                                 className={cn(
                                     "h-full rounded-full transition-all duration-500",
                                     targetPercent >= 100 ? 'bg-emerald-500' :
-                                    targetPercent >= timeGonePercent ? 'bg-amber-500' : 'bg-red-500'
+                                        targetPercent >= timeGonePercent ? 'bg-amber-500' : 'bg-red-500'
                                 )}
                                 style={{ width: `${Math.min(targetPercent, 100)}%` }}
                             />
                         </div>
 
-                        <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">
-                                Closing: <span className="font-medium text-emerald-500">{summary.closing}</span>
-                            </span>
-                            {summary.target > summary.input && (
-                                <span className="text-red-500">
-                                    Kurang: <span className="font-medium">{summary.target - summary.input}</span> lagi
-                                </span>
-                            )}
-                            {summary.target <= summary.input && summary.target > 0 && (
-                                <span className="text-emerald-500 font-medium">Target Tercapai!</span>
-                            )}
+                        {/* Stats Grid Inside Card */}
+                        <div className="grid grid-cols-4 gap-2">
+                            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-2 text-center">
+                                <div className="text-emerald-600 text-lg font-bold">{summary.closing}</div>
+                                <div className="text-[10px] text-emerald-600 font-medium">CLOSING</div>
+                            </div>
+                            <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-2 text-center">
+                                <div className="text-amber-600 text-lg font-bold">{summary.pending}</div>
+                                <div className="text-[10px] text-amber-600 font-medium">PENDING</div>
+                            </div>
+                            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-2 text-center">
+                                <div className="text-red-600 text-lg font-bold">{summary.rejected}</div>
+                                <div className="text-[10px] text-red-600 font-medium">REJECT</div>
+                            </div>
+                            <div className="bg-primary/10 border border-primary/20 rounded-xl p-2 text-center">
+                                <div className="text-primary text-lg font-bold">{summary.closing}</div>
+                                <div className="text-[10px] text-primary font-medium">ACC</div>
+                            </div>
                         </div>
+
+                        {summary.target > summary.input && (
+                            <div className="mt-3 text-center text-sm text-red-500">
+                                Kurang <span className="font-bold">{summary.target - summary.input}</span> lagi
+                            </div>
+                        )}
                     </div>
 
                     {/* Daily Progress Card - Clickable */}
@@ -356,40 +366,6 @@ export default function SpvDashboardPage() {
                         </div>
                     )}
 
-                    {/* Quick Stats Grid */}
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-emerald-500 rounded-xl shadow-md p-4 text-white">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-medium opacity-90">CLOSING</span>
-                                <span className="text-xl">✅</span>
-                            </div>
-                            <div className="text-3xl font-bold">{summary.closing}</div>
-                        </div>
-
-                        <div className="bg-amber-500 rounded-xl shadow-md p-4 text-white">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-medium opacity-90">PENDING</span>
-                                <span className="text-xl">⏳</span>
-                            </div>
-                            <div className="text-3xl font-bold">{summary.pending}</div>
-                        </div>
-
-                        <div className="bg-red-500 rounded-xl shadow-md p-4 text-white">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-medium opacity-90">REJECT</span>
-                                <span className="text-xl">❌</span>
-                            </div>
-                            <div className="text-3xl font-bold">{summary.rejected}</div>
-                        </div>
-
-                        <div className="bg-emerald-500 rounded-xl shadow-md p-4 text-white">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-medium opacity-90">ACC</span>
-                                <span className="text-xl">🎉</span>
-                            </div>
-                            <div className="text-3xl font-bold">{summary.closing}</div>
-                        </div>
-                    </div>
 
                     {/* Bottom Spacer */}
                     <div className="h-10" />
