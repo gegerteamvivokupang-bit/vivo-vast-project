@@ -82,13 +82,7 @@ export const NAV_CONFIG: Record<UserRole, NavItem[]> = {
             path: '/dashboard/team/performance',
             description: 'Performance & Underperform'
         },
-        {
-            key: 'spc',
-            label: 'SPC',
-            icon: '🏪',
-            path: '/dashboard/spc',
-            description: 'Toko SPC Grup'
-        },
+
         {
             key: 'export',
             label: 'Export',
