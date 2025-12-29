@@ -1042,7 +1042,8 @@ export default function ExportPage() {
                                 </thead>
                                 <tbody>
                                     {sators.slice(0, 15).map((s, i) => {
-                                        const pct = s.target > 0 ? Math.round((s.total_input / s.target) * 100) : 0;
+                                        const target = s.target || 0;
+                                        const pct = target > 0 ? Math.round((s.total_input / target) * 100) : 0;
                                         return (
                                             <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                                                 <td style={{ padding: '6px', fontWeight: 'bold', color: '#1e293b' }}>{s.name}</td>
