@@ -14,7 +14,41 @@ export default function BottomNav() {
 
   if (!user) return null
 
-  const navItems = getNavItemsForRole(user.role)
+  // Whitelist SPC Access
+  const canAccessSPC = (): boolean => {
+    if (!user) return false
+    // Manager area semua boleh akses SPC
+    if (user.role === 'manager') return true
+    // SPV Gery only
+    if (user.role === 'spv' && user.name?.toLowerCase().includes('gery')) return true
+    // SATOR Andri only
+    if (user.role === 'sator' && user.name?.toLowerCase().includes('andri')) return true
+    return false
+  }
+
+  // Get nav items untuk role
+  let navItems = getNavItemsForRole(user.role)
+
+  // Inject SPC menu untuk user yang di whitelist
+  if (canAccessSPC()) {
+    const spcMenuItem: NavItem = {
+      key: 'spc',
+      label: 'SPC',
+      icon: '🏪',
+      path: '/dashboard/spc',
+      description: 'Toko SPC Grup'
+    }
+
+    // Untuk SATOR & SPV: insert SPC sebelum menu terakhir (Report/Export)
+    if (user.role === 'sator' || user.role === 'spv') {
+      navItems = [
+        ...navItems.slice(0, navItems.length - 1),
+        spcMenuItem,
+        navItems[navItems.length - 1]
+      ]
+    }
+    // Manager sudah ada SPC di config, skip
+  }
 
   const handleNavClick = async (item: NavItem) => {
     if (item.key === 'profile' && pathname === '/profile') {

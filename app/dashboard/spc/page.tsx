@@ -8,7 +8,7 @@ import { ProfileSidebar } from '@/components/ProfileSidebar';
 import { Loading } from '@/components/ui/loading';
 import { Alert } from '@/components/ui/alert';
 import { createClient } from '@/lib/supabase/client';
-import { Bell, User, Calendar, ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import { User, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import html2canvas from 'html2canvas';
 
@@ -75,8 +75,8 @@ export default function SPCDashboardPage() {
     // Ref untuk PNG template
     const reportRef = useRef<HTMLDivElement>(null);
 
-    // View mode: daily or monthly
-    const [viewMode, setViewMode] = useState<'daily' | 'monthly'>('monthly');
+    // View mode: monthly only (no daily view)
+    const [viewMode] = useState<'daily' | 'monthly'>('monthly');
 
     // Date selection
     const [selectedDate, setSelectedDate] = useState(() => {
@@ -250,10 +250,11 @@ export default function SPCDashboardPage() {
         <DashboardLayout>
             <div className="min-h-screen bg-background pb-24">
 
-                {/* Header Banner */}
-                <div className="relative w-full bg-gradient-to-br from-purple-600 to-indigo-700 pb-8 pt-4 px-5 rounded-b-[2rem] shadow-lg overflow-hidden">
+                {/* Unified Header Banner - Match Manager Area Format */}
+                <div className="relative w-full bg-primary pb-8 pt-4 px-5 rounded-b-[2rem] shadow-lg overflow-hidden">
+                    {/* Abstract Decoration */}
                     <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl pointer-events-none" />
-                    <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 bg-purple-400 opacity-10 rounded-full blur-2xl pointer-events-none" />
+                    <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 bg-blue-400 opacity-10 rounded-full blur-2xl pointer-events-none" />
 
                     {/* Top Bar */}
                     <div className="relative z-10 flex items-center justify-between mb-6">
@@ -262,11 +263,13 @@ export default function SPCDashboardPage() {
                                 {user?.name ? getInitials(user.name) : <User className="w-6 h-6" />}
                             </div>
                             <div className="flex flex-col text-left">
-                                <span className="text-purple-200 text-xs font-medium uppercase tracking-wider">SPC DASHBOARD</span>
+                                <span className="text-blue-100 text-xs font-medium uppercase tracking-wider">SPC Toko Grup</span>
                                 <span className="text-white text-lg font-bold leading-tight">{user?.name || 'User'}</span>
                             </div>
                         </button>
-                        <div className="flex items-center gap-2">
+
+                        {/* Download PNG - HANYA untuk SATOR (Manager/SPV punya menu Export) */}
+                        {user?.role === 'sator' && (
                             <button
                                 onClick={handleExportPNG}
                                 disabled={exporting || stores.length === 0}
@@ -282,85 +285,55 @@ export default function SPCDashboardPage() {
                                 ) : (
                                     <Download className="w-4 h-4" />
                                 )}
-                                <span className="text-xs font-semibold">PNG</span>
+                                <span className="text-xs font-semibold">Download Gambar</span>
                             </button>
-                            <button className="flex items-center justify-center h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white">
-                                <Bell className="w-5 h-5" />
-                            </button>
-                        </div>
+                        )}
                     </div>
 
-                    {/* View Mode Toggle */}
-                    <div className="relative z-10 flex gap-2 mb-4">
-                        <button
-                            onClick={() => setViewMode('daily')}
-                            className={cn(
-                                "flex-1 py-2 rounded-xl font-semibold text-sm transition-all",
-                                viewMode === 'daily'
-                                    ? 'bg-white text-purple-700 shadow-md'
-                                    : 'bg-white/20 text-white/80 hover:bg-white/30'
-                            )}
-                        >
-                            HARIAN
-                        </button>
-                        <button
-                            onClick={() => setViewMode('monthly')}
-                            className={cn(
-                                "flex-1 py-2 rounded-xl font-semibold text-sm transition-all",
-                                viewMode === 'monthly'
-                                    ? 'bg-white text-purple-700 shadow-md'
-                                    : 'bg-white/20 text-white/80 hover:bg-white/30'
-                            )}
-                        >
-                            BULANAN
-                        </button>
-                    </div>
-
-                    {/* Stats Row */}
-                    <div className="relative z-10 flex justify-between items-end text-white">
-                        <div>
-                            <div className="text-purple-200 text-xs font-semibold mb-1">TOKO SPC</div>
-                            <div className="text-2xl font-bold tracking-tight">{stores.length} Toko</div>
-                        </div>
-                        {viewMode === 'monthly' && (
+                    {/* Date & Time Status Row with Navigation */}
+                    <div className="relative z-10 flex flex-col gap-3">
+                        <div className="flex justify-between items-end text-white">
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={goToPrev}
+                                    className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all"
+                                >
+                                    <ChevronLeft className="w-4 h-4" />
+                                </button>
+                                <div>
+                                    <div className="text-blue-200 text-xs font-semibold mb-1">PERIODE</div>
+                                    <div className="text-2xl font-bold tracking-tight">{getDisplayLabel()}</div>
+                                </div>
+                                <button
+                                    onClick={goToNext}
+                                    disabled={isAtCurrent()}
+                                    className={cn(
+                                        "w-8 h-8 rounded-full flex items-center justify-center transition-all",
+                                        isAtCurrent()
+                                            ? 'bg-white/5 opacity-50 cursor-not-allowed'
+                                            : 'bg-white/10 hover:bg-white/20'
+                                    )}
+                                >
+                                    <ChevronRight className="w-4 h-4" />
+                                </button>
+                            </div>
                             <div className="text-right">
-                                <div className="text-purple-200 text-xs font-semibold mb-1">TIME GONE</div>
+                                <div className="text-blue-200 text-xs font-semibold mb-1">TIME GONE</div>
                                 <div className="text-xl font-bold">{timeGonePercent}%</div>
                             </div>
-                        )}
+                        </div>
+                        {/* Time Progress Bar */}
+                        <div className="w-full h-2 bg-black/20 rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-gradient-to-r from-blue-300 to-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.5)]"
+                                style={{ width: `${timeGonePercent}%` }}
+                            />
+                        </div>
                     </div>
                 </div>
 
                 {/* Main Content */}
                 <div className="flex-1 px-5 -mt-6 relative z-20 flex flex-col gap-4">
-
-                    {/* Date Navigation */}
-                    <div className="bg-card border border-border rounded-2xl shadow-xl p-3 flex items-center justify-between">
-                        <button
-                            onClick={goToPrev}
-                            className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:bg-muted active:scale-95 transition-all"
-                        >
-                            <ChevronLeft className="w-5 h-5" />
-                        </button>
-
-                        <div className="text-center flex items-center gap-2">
-                            <Calendar className="w-4 h-4 text-muted-foreground" />
-                            <div className="text-lg font-bold text-foreground">{getDisplayLabel()}</div>
-                        </div>
-
-                        <button
-                            onClick={goToNext}
-                            disabled={isAtCurrent()}
-                            className={cn(
-                                "w-10 h-10 rounded-full flex items-center justify-center transition-all",
-                                isAtCurrent()
-                                    ? 'bg-muted text-muted-foreground/50 cursor-not-allowed'
-                                    : 'bg-muted text-muted-foreground hover:bg-muted active:scale-95'
-                            )}
-                        >
-                            <ChevronRight className="w-5 h-5" />
-                        </button>
-                    </div>
 
                     {/* Summary Card */}
                     <div className="bg-card border border-border rounded-2xl p-5 shadow-xl">
@@ -421,130 +394,104 @@ export default function SPCDashboardPage() {
                         </div>
                     </div>
 
-                    {/* Store List */}
+                    {/* Store Table */}
                     {stores.length === 0 ? (
                         <div className="bg-card border border-border rounded-2xl shadow-xl p-8 text-center">
                             <div className="text-5xl mb-3">🏪</div>
                             <h3 className="text-lg font-bold text-foreground mb-1">Tidak ada data</h3>
                             <p className="text-sm text-muted-foreground">
-                                Belum ada data untuk {viewMode === 'daily' ? 'tanggal' : 'bulan'} ini
+                                Belum ada data untuk bulan ini
                             </p>
                         </div>
                     ) : (
                         <div className="bg-card border border-border rounded-2xl shadow-xl overflow-hidden">
-                            <div className="px-4 py-2 flex justify-between items-center bg-gradient-to-r from-purple-500 to-indigo-500">
-                                <span className="text-white font-medium text-sm">DAFTAR TOKO SPC</span>
+                            <div className="px-4 py-3 flex justify-between items-center bg-gradient-to-r from-purple-500 to-indigo-500">
+                                <span className="text-white font-bold text-sm">DAFTAR TOKO SPC</span>
                                 <span className="text-white/80 text-xs">{stores.length} toko</span>
                             </div>
 
-                            <div className="divide-y divide-border">
-                                {stores.map((store) => {
-                                    const pct = getPercent(store);
-                                    const under = isUnderperform(store);
+                            {/* Table */}
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-xs">
+                                    <thead className="bg-muted/50 border-b border-border">
+                                        <tr>
+                                            <th className="sticky left-0 z-10 bg-muted/50 py-2 pl-3 pr-1 text-left text-[9px] font-bold uppercase text-muted-foreground">
+                                                Toko
+                                            </th>
+                                            <th className="px-1 py-2 text-center text-[9px] font-bold uppercase text-muted-foreground">
+                                                Tgt
+                                            </th>
+                                            <th className="px-1 py-2 text-center text-[9px] font-bold uppercase text-muted-foreground">
+                                                Inp
+                                            </th>
+                                            <th className="px-0.5 py-2 text-center text-[9px] font-bold uppercase text-emerald-500">
+                                                C
+                                            </th>
+                                            <th className="px-0.5 py-2 text-center text-[9px] font-bold uppercase text-amber-500">
+                                                P
+                                            </th>
+                                            <th className="px-0.5 py-2 text-center text-[9px] font-bold uppercase text-red-500">
+                                                R
+                                            </th>
+                                            <th className="pr-3 pl-1 py-2 text-right text-[9px] font-bold uppercase text-muted-foreground">
+                                                %
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border">
+                                        {stores
+                                            .sort((a, b) => b.total_input - a.total_input)
+                                            .map((store) => {
+                                                const pct = getPercent(store);
+                                                const under = isUnderperform(store);
 
-                                    return (
-                                        <div key={store.store_id} className="px-4 py-3">
-                                            {/* Row 1: Nama & Input */}
-                                            <div className="flex justify-between items-center mb-1">
-                                                <span className="font-semibold text-foreground">{store.store_name}</span>
-                                                <div className="text-right">
-                                                    <div className="text-[10px] text-muted-foreground font-medium uppercase">Total Inputan</div>
-                                                    <span className={cn(
-                                                        "text-xl font-bold",
-                                                        viewMode === 'monthly' && under ? 'text-red-500' : 'text-primary'
-                                                    )}>
-                                                        {store.total_input}
-                                                    </span>
-                                                </div>
-                                            </div>
-
-                                            {/* Row 2: Stats */}
-                                            <div className="flex justify-between items-center text-xs mb-2">
-                                                <div className="flex gap-3">
-                                                    {viewMode === 'monthly' && (
-                                                        <>
-                                                            <span className="text-muted-foreground">
-                                                                Target Toko: <span className="font-medium">{store.target || '-'}</span>
-                                                            </span>
-                                                            <span className={pct >= timeGonePercent ? 'text-emerald-500' : 'text-red-500'}>
-                                                                Pencapaian: {pct}%
-                                                            </span>
-                                                        </>
-                                                    )}
-                                                    <span className="text-muted-foreground">{store.store_code}</span>
-                                                </div>
-                                            </div>
-
-                                            {/* Row 3: Detail */}
-                                            <div className="flex gap-3 text-xs mb-2">
-                                                <span className="text-emerald-500">{store.total_closed} ACC</span>
-                                                <span className="text-amber-500">{store.total_pending} Pnd</span>
-                                                <span className="text-red-500">{store.total_rejected} Rej</span>
-                                            </div>
-
-                                            {/* Progress Bar (monthly only) */}
-                                            {viewMode === 'monthly' && (
-                                                <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden mb-3">
-                                                    <div
+                                                return (
+                                                    <tr
+                                                        key={store.store_id}
                                                         className={cn(
-                                                            "h-full rounded-full",
-                                                            under ? 'bg-red-500' : 'bg-emerald-500'
+                                                            "group transition-colors",
+                                                            under ? "bg-red-500/5 hover:bg-red-500/10" : "hover:bg-muted/30"
                                                         )}
-                                                        style={{ width: `${Math.min(pct, 100)}%` }}
-                                                    />
-                                                </div>
-                                            )}
-
-                                            {/* Detail Promotor */}
-                                            {store.promotors && store.promotors.length > 0 && (
-                                                <div className="mt-3 pt-3 border-t border-border/50">
-                                                    <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
-                                                        📋 Promotor ({store.promotors.length})
-                                                    </div>
-                                                    <div className="space-y-1.5">
-                                                        {store.promotors.map((promotor) => {
-                                                            const promotorPct = viewMode === 'monthly' && promotor.target
-                                                                ? Math.round((promotor.total_input / promotor.target) * 100)
-                                                                : 0;
-                                                            const promotorUnder = viewMode === 'monthly' && promotor.target
-                                                                ? promotorPct < timeGonePercent
-                                                                : false;
-
-                                                            return (
-                                                                <div key={promotor.user_id} className="flex justify-between items-center text-xs bg-muted/30 rounded-lg px-3 py-2">
-                                                                    <div className="flex-1">
-                                                                        <span className="font-medium text-foreground">{promotor.name}</span>
-                                                                        {viewMode === 'monthly' && (
-                                                                            <span className="text-muted-foreground ml-2">
-                                                                                Target: <span className="font-semibold">{promotor.target || 0}</span>
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className={cn(
-                                                                            "font-bold",
-                                                                            viewMode === 'monthly' && promotorUnder ? 'text-red-500' : 'text-primary'
-                                                                        )}>
-                                                                            {promotor.total_input}
-                                                                        </span>
-                                                                        {viewMode === 'monthly' && promotor.target && (
-                                                                            <span className={cn(
-                                                                                "text-[10px] font-semibold",
-                                                                                promotorUnder ? 'text-red-500' : 'text-emerald-500'
-                                                                            )}>
-                                                                                {promotorPct}%
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
+                                                    >
+                                                        <td className="sticky left-0 z-10 bg-background group-hover:bg-muted/10 py-2 pl-3 pr-1">
+                                                            <div className="flex items-center gap-1">
+                                                                {under && <div className="w-1 h-1 rounded-full bg-red-500 shrink-0" />}
+                                                                <div className="flex flex-col min-w-0">
+                                                                    <span className="font-bold text-foreground text-[11px] truncate">{store.store_name}</span>
+                                                                    <span className="text-[8px] text-muted-foreground truncate">{store.store_code}</span>
                                                                 </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-1 py-2 text-center">
+                                                            <div className="font-semibold text-[10px]">{store.target || 0}</div>
+                                                        </td>
+                                                        <td className="px-1 py-2 text-center">
+                                                            <div className={cn(
+                                                                "font-bold text-[11px]",
+                                                                under ? 'text-red-500' : 'text-primary'
+                                                            )}>{store.total_input}</div>
+                                                        </td>
+                                                        <td className="px-0.5 py-2 text-center font-semibold text-[10px] text-emerald-500">
+                                                            {store.total_closed}
+                                                        </td>
+                                                        <td className="px-0.5 py-2 text-center font-semibold text-[10px] text-amber-500">
+                                                            {store.total_pending}
+                                                        </td>
+                                                        <td className="px-0.5 py-2 text-center font-semibold text-[10px] text-red-500">
+                                                            {store.total_rejected}
+                                                        </td>
+                                                        <td className="pr-3 pl-1 py-2 text-right">
+                                                            <div className={cn(
+                                                                "font-black text-[11px]",
+                                                                pct >= 100 ? 'text-emerald-500' :
+                                                                    pct >= timeGonePercent ? 'text-primary' : 'text-red-500'
+                                                            )}>{pct}%</div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     )}
@@ -565,11 +512,10 @@ export default function SPCDashboardPage() {
                         <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: '#7c3aed', margin: '0 0 8px 0' }}>SPC GRUP</h1>
                         <div style={{ fontSize: '13px', color: '#374151', lineHeight: '1.6' }}>
                             <div><strong>AREA:</strong> TIMOR-SUMBA</div>
-                            <div><strong>{user?.role === 'sator' ? 'SATOR' : user?.role === 'spv' ? 'SPV' : 'MANAGER'}:</strong> {user?.name || 'N/A'}</div>
                             <div><strong>PERIODE:</strong> {periodLabel}</div>
                         </div>
                         <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '8px' }}>
-                            Jumat, {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })} | Time Gone: {timeGonePercent}%
+                            {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })} | Time Gone: {timeGonePercent}%
                         </div>
                     </div>
 
@@ -655,11 +601,6 @@ export default function SPCDashboardPage() {
                                 })}
                             </tbody>
                         </table>
-                    </div>
-
-                    {/* Footer */}
-                    <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ fontSize: '9px', color: '#9ca3af' }}>Generated by SMARA System | Time Gone: {timeGonePercent}%</div>
                     </div>
                 </div>
             </div>

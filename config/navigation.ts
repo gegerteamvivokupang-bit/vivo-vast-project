@@ -101,6 +101,7 @@ export const NAV_CONFIG: Record<UserRole, NavItem[]> = {
     // ============================================
     // SATOR (Satuan Toko) - Koordinator per toko
     // Fokus: MONITOR toko, mirip SPV tapi level toko
+    // Note: SPC menu akan ditambahkan secara dinamis untuk SATOR Andri
     // ============================================
     sator: [
         {
@@ -123,13 +124,6 @@ export const NAV_CONFIG: Record<UserRole, NavItem[]> = {
             icon: '👥',
             path: '/dashboard/store',
             description: 'Performance Promotor'
-        },
-        {
-            key: 'spc',
-            label: 'SPC',
-            icon: '🏪',
-            path: '/dashboard/spc',
-            description: 'Toko SPC Grup'
         },
         {
             key: 'report',

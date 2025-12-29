@@ -79,7 +79,17 @@ export async function GET(request: NextRequest) {
         date: targetDate,
         supervisor: userData.name,
         leaderboard: [],
-        totals: { target: 0, input: 0, acc: 0, pending: 0, reject: 0 }
+        totals: {
+          target: 0,
+          daily_input: 0,
+          total_input: 0,
+          daily_closed: 0,
+          total_closed: 0,
+          daily_pending: 0,
+          total_pending: 0,
+          daily_rejected: 0,
+          total_rejected: 0
+        }
       })
     }
 
@@ -90,48 +100,89 @@ export async function GET(request: NextRequest) {
       .in('id', promotorIds)
       .eq('role', 'promotor')
 
-    // Get daily aggregate data from VIEW
-    const { data: aggData } = await supabase
+    // Get daily aggregate data for TODAY
+    const { data: dailyData } = await supabase
       .from('v_agg_daily_promoter_all')
       .select('*')
       .in('promoter_user_id', promotorIds)
       .eq('agg_date', targetDate)
 
-    // Get monthly targets
-    const targetMonth = targetDate.substring(0, 7) + '-01'
+    // Get cumulative monthly data from monthly view (use range query like team dashboard)
+    const targetMonth = targetDate.substring(0, 7)  // 'YYYY-MM'
+    const startDate = targetMonth + '-01'
+
+    // Calculate next month for range query
+    const [yearStr, monthStr] = targetMonth.split('-')
+    let year = parseInt(yearStr)
+    let month = parseInt(monthStr)
+    month++ // next month
+    if (month > 12) {
+      month = 1
+      year++
+    }
+    const endDate = `${year}-${String(month).padStart(2, '0')}-01`
+
+    const { data: monthlyData } = await supabase
+      .from('v_agg_monthly_promoter_all')
+      .select('*')
+      .in('promoter_user_id', promotorIds)
+      .gte('agg_month', startDate)
+      .lt('agg_month', endDate)
+
+    // Get monthly targets (match team dashboard format)
     const { data: targetsData } = await supabase
       .from('targets')
       .select('user_id, target_value')
       .in('user_id', promotorIds)
       .eq('month', targetMonth)
 
-    const aggMap = new Map((aggData || []).map(row => [row.promoter_user_id, row]))
+    const dailyMap = new Map((dailyData || []).map(row => [row.promoter_user_id, row]))
+    const monthlyMap = new Map((monthlyData || []).map(row => [row.promoter_user_id, row]))
     const targetMap = new Map((targetsData || []).map(t => [t.user_id, t.target_value]))
 
-    // Build leaderboard
+    // Build leaderboard with H/T/TGT format
     const leaderboard = (promotorUsers || []).map(user => {
-      const agg = aggMap.get(user.id)
+      const daily = dailyMap.get(user.id)
+      const monthly = monthlyMap.get(user.id) || { total_input: 0, total_closed: 0, total_pending: 0, total_rejected: 0 }
       return {
         id: user.id,
         name: user.name || 'Unknown',
         target: targetMap.get(user.id) || 0,
-        input: agg?.total_input || 0,
-        acc: agg?.total_closed || 0,
-        pending: agg?.total_pending || 0,
-        reject: agg?.total_rejected || 0,
+        daily_input: daily?.total_input || 0,
+        total_input: monthly.total_input,
+        daily_closed: daily?.total_closed || 0,
+        total_closed: monthly.total_closed,
+        daily_pending: daily?.total_pending || 0,
+        total_pending: monthly.total_pending,
+        daily_rejected: daily?.total_rejected || 0,
+        total_rejected: monthly.total_rejected,
       }
-    }).sort((a, b) => b.input - a.input) // Sort by input descending
+    }).sort((a, b) => b.total_input - a.total_input) // Sort by monthly total
 
     // Calculate totals
     const totals = leaderboard.reduce(
       (acc, p) => ({
         target: acc.target + p.target,
-        input: acc.input + p.input,
-        acc: acc.acc + p.acc,
-        pending: acc.pending + p.pending,
-        reject: acc.reject + p.reject,
+        daily_input: acc.daily_input + p.daily_input,
+        total_input: acc.total_input + p.total_input,
+        daily_closed: acc.daily_closed + p.daily_closed,
+        total_closed: acc.total_closed + p.total_closed,
+        daily_pending: acc.daily_pending + p.daily_pending,
+        total_pending: acc.total_pending + p.total_pending,
+        daily_rejected: acc.daily_rejected + p.daily_rejected,
+        total_rejected: acc.total_rejected + p.total_rejected,
       }),
-      { target: 0, input: 0, acc: 0, pending: 0, reject: 0 }
+      {
+        target: 0,
+        daily_input: 0,
+        total_input: 0,
+        daily_closed: 0,
+        total_closed: 0,
+        daily_pending: 0,
+        total_pending: 0,
+        daily_rejected: 0,
+        total_rejected: 0
+      }
     )
 
     return NextResponse.json({

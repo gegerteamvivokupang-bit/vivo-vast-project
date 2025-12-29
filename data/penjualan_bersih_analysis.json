@@ -1,0 +1,232 @@
+{
+  "totalRows": 1498,
+  "columns": [
+    "Timestamp",
+    "Nama Promotor",
+    "Status",
+    "ID Toko",
+    "Sator",
+    "Area"
+  ],
+  "sampleData": [
+    {
+      "Timestamp": 45992.0002209259,
+      "Nama Promotor": "ROS YANE KANA LUDJI",
+      "Status": "Belum disetujui",
+      "ID Toko": "SPC013",
+      "Sator": "TUTOR ANDRI RUDOLOF ELI MANAFE",
+      "Area": "KUPANG"
+    },
+    {
+      "Timestamp": 45992.3924759027,
+      "Nama Promotor": "MARNITHA JUWIKE TIMORATI RUNESI",
+      "Status": "Belum disetujui",
+      "ID Toko": "SPC005",
+      "Sator": "TUTOR ANDRI RUDOLOF ELI MANAFE",
+      "Area": "KUPANG"
+    },
+    {
+      "Timestamp": 45992.4121676157,
+      "Nama Promotor": "ROS YANE KANA LUDJI",
+      "Status": "Belum disetujui",
+      "ID Toko": "SPC013",
+      "Sator": "TUTOR ANDRI RUDOLOF ELI MANAFE",
+      "Area": "KUPANG"
+    },
+    {
+      "Timestamp": 45992.4224236458,
+      "Nama Promotor": "ANDHIKA ULLY",
+      "Status": "Belum disetujui",
+      "ID Toko": "ERA001",
+      "Sator": "TUTOR ANTONIO DE JANAIRO TOMASOEY",
+      "Area": "KUPANG"
+    },
+    {
+      "Timestamp": 45992.4236633101,
+      "Nama Promotor": "MARNITHA JUWIKE TIMORATI RUNESI",
+      "Status": "Belum disetujui",
+      "ID Toko": "SPC005",
+      "Sator": "TUTOR ANDRI RUDOLOF ELI MANAFE",
+      "Area": "KUPANG"
+    },
+    {
+      "Timestamp": 45992.4375638541,
+      "Nama Promotor": "AINI RAHMATINI NATALIA MOESTAKIM",
+      "Status": "Dapat limit tapi belum diproses",
+      "Tipe hp": "Y21d series",
+      "ID Toko": "SPC006",
+      "Sator": "TUTOR ANDRI RUDOLOF ELI MANAFE",
+      "Area": "KUPANG"
+    },
+    {
+      "Timestamp": 45992.4676927546,
+      "Nama Promotor": "EMPI FRANGKI LIEM",
+      "Status": "Belum disetujui",
+      "ID Toko": "MCE001",
+      "Sator": "TUTOR ANTONIO DE JANAIRO TOMASOEY",
+      "Area": "KUPANG"
+    },
+    {
+      "Timestamp": 45992.5054404282,
+      "Nama Promotor": "YENDRI ELISHABET BERELOE",
+      "Status": "Belum disetujui",
+      "ID Toko": "SCO001",
+      "Sator": "TUTOR ANTONIO DE JANAIRO TOMASOEY",
+      "Area": "KUPANG"
+    },
+    {
+      "Timestamp": 45992.564250324,
+      "Nama Promotor": "ANNA RAHMATIA JUFRI",
+      "Status": "Belum disetujui",
+      "ID Toko": "BGD001",
+      "Sator": "TUTOR YACOB CHRISTIAN BOLING",
+      "Area": "KABUPATEN"
+    },
+    {
+      "Timestamp": 45992.568997662,
+      "Nama Promotor": "SANTI MARIA LUKMINI NAHAK",
+      "Status": "Belum disetujui",
+      "ID Toko": "PKR001",
+      "Sator": "SPV WILIBRODUS R MANEK SAMARA",
+      "Area": "KABUPATEN"
+    },
+    {
+      "Timestamp": 45992.5697522106,
+      "Nama Promotor": "RESTIANY MARIA LUAN KALI",
+      "Status": "Belum disetujui",
+      "ID Toko": "SPC007",
+      "Sator": "TUTOR ANDRI RUDOLOF ELI MANAFE",
+      "Area": "KUPANG"
+    },
+    {
+      "Timestamp": 45992.5753159606,
+      "Nama Promotor": "NUR FATIMAH MOLBANG",
+      "Status": "Belum disetujui",
+      "ID Toko": "PUT001",
+      "Sator": "TUTOR LEU ADOLF QICHEN LEI BAIT",
+      "Area": "KABUPATEN"
+    },
+    {
+      "Timestamp": 45992.5792065162,
+      "Nama Promotor": "NUR FATIMAH MOLBANG",
+      "Status": "Belum disetujui",
+      "ID Toko": "PUT001",
+      "Sator": "TUTOR LEU ADOLF QICHEN LEI BAIT",
+      "Area": "KABUPATEN"
+    },
+    {
+      "Timestamp": 45992.5831823726,
+      "Nama Promotor": "PATRIANI MENGI ULY",
+      "Status": "Belum disetujui",
+      "ID Toko": "SPC004",
+      "Sator": "TUTOR ANDRI RUDOLOF ELI MANAFE",
+      "Area": "KUPANG"
+    },
+    {
+      "Timestamp": 45992.606386493,
+      "Nama Promotor": "BERGITHA NIA OLIN",
+      "Status": "Belum disetujui",
+      "ID Toko": "INF001",
+      "Sator": "TUTOR LEU ADOLF QICHEN LEI BAIT",
+      "Area": "KABUPATEN"
+    },
+    {
+      "Timestamp": 45992.614785243,
+      "Nama Promotor": "YENDRI ELISHABET BERELOE",
+      "Status": "Dapat limit tapi belum diproses",
+      "Tipe hp": "Y21d series",
+      "ID Toko": "SCO001",
+      "Sator": "TUTOR ANTONIO DE JANAIRO TOMASOEY",
+      "Area": "KUPANG"
+    },
+    {
+      "Timestamp": 45992.6732890509,
+      "Nama Promotor": "NABILA RAHMAWATI",
+      "Status": "Belum disetujui",
+      "ID Toko": "AZI001",
+      "Sator": "SPV ANFAL JUPRIADI AMBU WARU",
+      "Area": "SUMBA"
+    },
+    {
+      "Timestamp": 45992.7281263194,
+      "Nama Promotor": "WARDIA",
+      "Status": "Belum disetujui",
+      "ID Toko": "SPC006",
+      "Sator": "TUTOR ANDRI RUDOLOF ELI MANAFE",
+      "Area": "KUPANG"
+    },
+    {
+      "Timestamp": 45992.7436840393,
+      "Nama Promotor": "ESTER LUDJI",
+      "Status": "ACC",
+      "Tipe hp": "Y21d series",
+      "ID Toko": "SPC010",
+      "Sator": "TUTOR KUSMYATI KILIMANDU",
+      "Area": "SUMBA"
+    },
+    {
+      "Timestamp": 45992.7678594791,
+      "Nama Promotor": "ESTER LUDJI",
+      "Status": "Belum disetujui",
+      "ID Toko": "SPC010",
+      "Sator": "TUTOR KUSMYATI KILIMANDU",
+      "Area": "SUMBA"
+    }
+  ],
+  "columnAnalysis": [
+    {
+      "name": "Timestamp",
+      "uniqueCount": 965,
+      "sampleValues": [
+        45992.0002209259,
+        45992.3924759027,
+        45992.4121676157
+      ]
+    },
+    {
+      "name": "Nama Promotor",
+      "uniqueCount": 62,
+      "sampleValues": [
+        "ROS YANE KANA LUDJI",
+        "MARNITHA JUWIKE TIMORATI RUNESI",
+        "ROS YANE KANA LUDJI"
+      ]
+    },
+    {
+      "name": "Status",
+      "uniqueCount": 4,
+      "sampleValues": [
+        "Belum disetujui",
+        "Belum disetujui",
+        "Belum disetujui"
+      ]
+    },
+    {
+      "name": "ID Toko",
+      "uniqueCount": 46,
+      "sampleValues": [
+        "SPC013",
+        "SPC005",
+        "SPC013"
+      ]
+    },
+    {
+      "name": "Sator",
+      "uniqueCount": 10,
+      "sampleValues": [
+        "TUTOR ANDRI RUDOLOF ELI MANAFE",
+        "TUTOR ANDRI RUDOLOF ELI MANAFE",
+        "TUTOR ANDRI RUDOLOF ELI MANAFE"
+      ]
+    },
+    {
+      "name": "Area",
+      "uniqueCount": 4,
+      "sampleValues": [
+        "KUPANG",
+        "KUPANG",
+        "KUPANG"
+      ]
+    }
+  ]
+}

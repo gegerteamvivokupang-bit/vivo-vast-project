@@ -6,32 +6,37 @@ import DashboardLayout from '@/components/layouts/DashboardLayout';
 import { Loading } from '@/components/ui/loading';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-
-type ReportType = 'daily' | 'monthly';
 
 interface LeaderboardItem {
     id: string;
     name: string;
     target: number;
-    input: number;
-    acc: number;
-    pending: number;
-    reject: number;
+    daily_input: number;
+    total_input: number;
+    daily_closed: number;
+    total_closed: number;
+    daily_pending: number;
+    total_pending: number;
+    daily_rejected: number;
+    total_rejected: number;
 }
 
 interface ReportData {
-    date?: string;
-    month?: string;
+    date: string;
     supervisor: string;
     leaderboard: LeaderboardItem[];
     totals: {
         target: number;
-        input: number;
-        acc: number;
-        pending: number;
-        reject: number;
+        daily_input: number;
+        total_input: number;
+        daily_closed: number;
+        total_closed: number;
+        daily_pending: number;
+        total_pending: number;
+        daily_rejected: number;
+        total_rejected: number;
     };
 }
 
@@ -49,46 +54,9 @@ const formatDateShort = (dateStr: string) => {
     return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
 };
 
-const formatMonth = (monthStr: string) => {
-    const parts = monthStr.split('-');
-    const year = parts[0];
-    const monthIndex = parseInt(parts[1], 10) - 1;
-    const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-    return `${months[monthIndex]} ${year}`;
-};
-
-const formatMonthShort = (monthStr: string) => {
-    const parts = monthStr.split('-');
-    const year = parts[0];
-    const monthIndex = parseInt(parts[1], 10) - 1;
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-    return `${months[monthIndex]} ${year}`;
-};
-
 const formatFirstName = (fullName: string) => {
     const firstName = fullName.trim().split(' ')[0];
     return firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
-};
-
-const getDateRange = (monthStr: string, todayStr: string) => {
-    const parts = monthStr.split('-');
-    const year = parseInt(parts[0], 10);
-    const monthIndex = parseInt(parts[1], 10) - 1;
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-    const lastDayOfMonth = new Date(year, monthIndex + 1, 0).getDate();
-    const todayParts = todayStr.split('-');
-    const todayYear = parseInt(todayParts[0], 10);
-    const todayMonth = parseInt(todayParts[1], 10) - 1;
-    const todayDate = parseInt(todayParts[2], 10);
-
-    let endDay: number;
-    if (year === todayYear && monthIndex === todayMonth) {
-        endDay = todayDate;
-    } else {
-        endDay = lastDayOfMonth;
-    }
-    return `1 - ${endDay} ${months[monthIndex]} ${year}`;
 };
 
 export default function ReportPage() {
@@ -100,7 +68,6 @@ export default function ReportPage() {
     const [error, setError] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [activeTab, setActiveTab] = useState<ReportType>('daily');
 
     const today = new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Asia/Makassar',
@@ -108,10 +75,8 @@ export default function ReportPage() {
         month: '2-digit',
         day: '2-digit'
     }).format(new Date());
-    const currentMonth = today.substring(0, 7);
 
     const [selectedDate, setSelectedDate] = useState(today);
-    const [selectedMonth, setSelectedMonth] = useState(currentMonth);
     const isFirstLoad = useRef(true);
 
     useEffect(() => {
@@ -119,7 +84,7 @@ export default function ReportPage() {
             fetchReportData(isFirstLoad.current);
             isFirstLoad.current = false;
         }
-    }, [user, activeTab, selectedDate, selectedMonth]);
+    }, [user, selectedDate]);
 
     const fetchReportData = async (isInitial = false) => {
         if (isInitial) setInitialLoading(true);
@@ -127,12 +92,7 @@ export default function ReportPage() {
         setError(null);
 
         try {
-            let url: string;
-            if (activeTab === 'daily') {
-                url = `/api/report/daily?date=${selectedDate}`;
-            } else {
-                url = `/api/report/monthly?month=${selectedMonth}`;
-            }
+            const url = `/api/report/daily?date=${selectedDate}`;
             const response = await fetch(url);
             if (!response.ok) throw new Error('Failed to fetch report data');
             const result = await response.json();
@@ -153,13 +113,6 @@ export default function ReportPage() {
         setSelectedDate(newDate);
     };
 
-    const changeMonth = (months: number) => {
-        const [year, month] = selectedMonth.split('-').map(Number);
-        const date = new Date(year, month - 1 + months, 1);
-        const newMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        setSelectedMonth(newMonth);
-    };
-
     const getRankEmoji = (index: number) => {
         if (index === 0) return '🥇';
         if (index === 1) return '🥈';
@@ -169,12 +122,9 @@ export default function ReportPage() {
 
     const generateWAText = () => {
         if (!data) return '';
-        const isMonthly = activeTab === 'monthly';
-        const periodLabel = isMonthly
-            ? formatMonthShort(data.month || selectedMonth)
-            : formatDateShort(data.date || selectedDate);
+        const periodLabel = formatDateShort(data.date || selectedDate);
 
-        let text = isMonthly ? `📊 *LAPORAN BULANAN*\n` : `📊 *LAPORAN HARIAN*\n`;
+        let text = `📊 *LAPORAN TIM*\n`;
         text += `📅 ${periodLabel}\n`;
         text += `👤 ${data.supervisor}\n\n`;
 
@@ -184,24 +134,17 @@ export default function ReportPage() {
             text += `🏆 *LEADERBOARD:*\n`;
             data.leaderboard.forEach((item, index) => {
                 const emoji = getRankEmoji(index);
-                // Format: 🥇 Nama : 5 Input (1 ACC, 2 PND, 0 REJ)
-                let detail = [];
-                if (item.acc > 0) detail.push(`${item.acc}✅`);
-                if (item.pending > 0) detail.push(`${item.pending}⏳`);
-                if (item.reject > 0) detail.push(`${item.reject}❌`);
-
-                const detailStr = detail.length > 0 ? `(${detail.join(' ')})` : '';
-
-                text += `${emoji} *${formatFirstName(item.name)}* : ${item.input} 📥 ${detailStr}\n`;
+                text += `${emoji} *${formatFirstName(item.name)}*: ${item.daily_input}/${item.total_input}/${item.target}\n`;
             });
         }
 
         text += `\n══════════════════\n`;
-        text += `📈 *TOTAL ${isMonthly ? 'BULAN INI' : 'HARI INI'}*\n`;
-        text += `📥 Input   : ${data.totals.input}\n`;
-        text += `✅ ACC     : ${data.totals.acc}\n`;
-        text += `⏳ Pending : ${data.totals.pending}\n`;
-        text += `❌ Reject  : ${data.totals.reject}`;
+        text += `📈 *TOTAL TIM*\n`;
+        text += `📥 Input (H/T): ${data.totals.daily_input}/${data.totals.total_input}\n`;
+        text += `🎯 Target: ${data.totals.target}\n`;
+        text += `✅ Closing: ${data.totals.total_closed}\n`;
+        text += `⏳ Pending: ${data.totals.total_pending}\n`;
+        text += `❌ Reject: ${data.totals.total_rejected}`;
 
         return text;
     };
@@ -224,9 +167,7 @@ export default function ReportPage() {
         try {
             const html2canvas = (await import('html2canvas')).default;
             const canvas = await html2canvas(tableRef.current, { backgroundColor: '#ffffff', scale: 2 });
-            const filename = activeTab === 'daily'
-                ? `laporan-harian-${selectedDate}.png`
-                : `laporan-bulanan-${selectedMonth}.png`;
+            const filename = `laporan-tim-${selectedDate}.png`;
             const link = document.createElement('a');
             link.download = filename;
             link.href = canvas.toDataURL('image/png');
@@ -259,7 +200,7 @@ export default function ReportPage() {
 
     return (
         <DashboardLayout requiredRole={['spv', 'sator', 'manager', 'admin']}>
-            <div className="min-h-screen bg-background">
+            <div className="min-h-screen bg-background pb-24">
                 {/* Header */}
                 <div className="bg-warning pt-4 pb-5 px-4 rounded-b-3xl shadow-md">
                     <div className="flex items-center gap-3 mb-3">
@@ -268,42 +209,16 @@ export default function ReportPage() {
                         </div>
                         <div>
                             <h1 className="text-primary-foreground font-bold text-base">
-                                Laporan {activeTab === 'daily' ? 'Harian' : 'Bulanan'}
+                                Laporan Tim
                             </h1>
                             <p className="text-primary-foreground/60 text-xs">{data?.supervisor}</p>
                         </div>
                     </div>
 
-                    {/* Tab Switcher */}
-                    <div className="flex gap-2 mb-3">
-                        <button
-                            onClick={() => setActiveTab('daily')}
-                            className={cn(
-                                "flex-1 py-2 rounded-xl text-sm font-medium transition-all",
-                                activeTab === 'daily'
-                                    ? 'bg-card text-warning'
-                                    : 'bg-card/20 text-primary-foreground hover:bg-card/30'
-                            )}
-                        >
-                            Harian
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('monthly')}
-                            className={cn(
-                                "flex-1 py-2 rounded-xl text-sm font-medium transition-all",
-                                activeTab === 'monthly'
-                                    ? 'bg-card text-warning'
-                                    : 'bg-card/20 text-primary-foreground hover:bg-card/30'
-                            )}
-                        >
-                            Bulanan
-                        </button>
-                    </div>
-
-                    {/* Date/Month Navigation */}
+                    {/* Date Navigation */}
                     <div className="flex items-center justify-between bg-card/10 backdrop-blur-sm rounded-xl p-2">
                         <button
-                            onClick={() => activeTab === 'daily' ? changeDate(-1) : changeMonth(-1)}
+                            onClick={() => changeDate(-1)}
                             className="w-9 h-9 flex items-center justify-center text-primary-foreground hover:bg-card/10 rounded-xl transition-colors"
                         >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -311,33 +226,18 @@ export default function ReportPage() {
                             </svg>
                         </button>
                         <div className="text-center">
-                            {activeTab === 'daily' ? (
-                                <>
-                                    <input
-                                        type="date"
-                                        value={selectedDate}
-                                        onChange={(e) => setSelectedDate(e.target.value)}
-                                        max={today}
-                                        className="bg-transparent text-primary-foreground text-sm font-medium text-center cursor-pointer [color-scheme:dark]"
-                                    />
-                                    <p className="text-primary-foreground/50 text-[10px]">{formatDate(selectedDate)}</p>
-                                </>
-                            ) : (
-                                <>
-                                    <input
-                                        type="month"
-                                        value={selectedMonth}
-                                        onChange={(e) => setSelectedMonth(e.target.value)}
-                                        max={currentMonth}
-                                        className="bg-transparent text-primary-foreground text-sm font-medium text-center cursor-pointer [color-scheme:dark]"
-                                    />
-                                    <p className="text-primary-foreground/50 text-[10px]">{formatMonth(selectedMonth)}</p>
-                                </>
-                            )}
+                            <input
+                                type="date"
+                                value={selectedDate}
+                                onChange={(e) => setSelectedDate(e.target.value)}
+                                max={today}
+                                className="bg-transparent text-primary-foreground text-sm font-medium text-center cursor-pointer [color-scheme:dark]"
+                            />
+                            <p className="text-primary-foreground/50 text-[10px]">{formatDate(selectedDate)}</p>
                         </div>
                         <button
-                            onClick={() => activeTab === 'daily' ? changeDate(1) : changeMonth(1)}
-                            disabled={activeTab === 'daily' ? selectedDate >= today : selectedMonth >= currentMonth}
+                            onClick={() => changeDate(1)}
+                            disabled={selectedDate >= today}
                             className="w-9 h-9 flex items-center justify-center text-primary-foreground hover:bg-card/10 rounded-xl transition-colors disabled:opacity-30"
                         >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -348,39 +248,28 @@ export default function ReportPage() {
                 </div>
 
                 {/* Content */}
-                <div className="px-4 pt-4 pb-24">
+                <div className="px-4 pt-4">
                     {/* Table for Image Export */}
                     <Card ref={tableRef} className="overflow-hidden">
                         {/* Table Header */}
-                        <div className="bg-warning px-4 py-3">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h2 className="text-primary-foreground font-bold text-sm">{data?.supervisor || '-'}</h2>
-                                    <p className="text-primary-foreground/70 text-xs">
-                                        {activeTab === 'daily'
-                                            ? formatDateShort(data?.date || selectedDate)
-                                            : getDateRange(data?.month || selectedMonth, today)
-                                        }
-                                    </p>
-                                </div>
-                                <div className="text-right">
-                                    <span className="bg-card/20 text-primary-foreground text-xs px-2 py-1 rounded-xl">
-                                        {activeTab === 'daily' ? 'Harian' : 'Bulanan'}
-                                    </span>
-                                </div>
+                        <div style={{ backgroundColor: '#f59e0b', padding: '12px 16px' }}>
+                            <div>
+                                <h2 style={{ color: 'white', fontWeight: 'bold', fontSize: '14px', margin: 0 }}>{data?.supervisor || '-'}</h2>
+                                <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px', margin: '2px 0 0 0' }}>
+                                    {formatDateShort(data?.date || selectedDate)}
+                                </p>
                             </div>
                         </div>
 
-                        {/* Table */}
+                        {/* Table - Format H/T/TGT */}
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead className="bg-muted border-b">
                                     <tr>
                                         <th className="px-3 py-2 text-left text-muted-foreground font-semibold w-8">#</th>
                                         <th className="px-3 py-2 text-left text-muted-foreground font-semibold">Nama</th>
-                                        <th className="px-2 py-2 text-center text-muted-foreground font-semibold w-12">TGT</th>
-                                        <th className="px-2 py-2 text-center text-primary font-semibold w-12">IN</th>
-                                        <th className="px-2 py-2 text-center text-success font-semibold w-12">ACC</th>
+                                        <th className="px-2 py-2 text-center text-primary font-semibold">INPUT (H/T/TGT)</th>
+                                        <th className="px-2 py-2 text-center text-success font-semibold w-12">CLO</th>
                                         <th className="px-2 py-2 text-center text-warning font-semibold w-12">PND</th>
                                         <th className="px-2 py-2 text-center text-destructive font-semibold w-12">REJ</th>
                                     </tr>
@@ -388,7 +277,7 @@ export default function ReportPage() {
                                 <tbody>
                                     {fetching ? (
                                         <tr>
-                                            <td colSpan={7} className="px-4 py-8 text-center">
+                                            <td colSpan={6} className="px-4 py-8 text-center">
                                                 <div className="flex items-center justify-center gap-2 text-muted-foreground">
                                                     <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
                                                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -400,8 +289,8 @@ export default function ReportPage() {
                                         </tr>
                                     ) : data?.leaderboard.length === 0 ? (
                                         <tr>
-                                            <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
-                                                Belum ada data untuk {activeTab === 'daily' ? 'tanggal' : 'bulan'} ini
+                                            <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                                                Belum ada data untuk tanggal ini
                                             </td>
                                         </tr>
                                     ) : (
@@ -415,11 +304,18 @@ export default function ReportPage() {
                                                 <td className="px-3 py-2 font-medium text-foreground truncate max-w-[120px]">
                                                     {formatFirstName(item.name)}
                                                 </td>
-                                                <td className="px-2 py-2 text-center text-muted-foreground">{item.target || '-'}</td>
-                                                <td className="px-2 py-2 text-center font-bold text-primary">{item.input}</td>
-                                                <td className="px-2 py-2 text-center font-bold text-success">{item.acc}</td>
-                                                <td className="px-2 py-2 text-center font-bold text-warning">{item.pending}</td>
-                                                <td className="px-2 py-2 text-center font-bold text-destructive">{item.reject}</td>
+                                                <td className="px-2 py-2 text-center font-bold text-primary font-mono text-xs">
+                                                    {item.daily_input}/{item.total_input}/{item.target || '-'}
+                                                </td>
+                                                <td className="px-2 py-2 text-center font-bold text-success font-mono text-xs">
+                                                    {item.daily_closed}/{item.total_closed}
+                                                </td>
+                                                <td className="px-2 py-2 text-center font-bold text-warning font-mono text-xs">
+                                                    {item.daily_pending}/{item.total_pending}
+                                                </td>
+                                                <td className="px-2 py-2 text-center font-bold text-destructive font-mono text-xs">
+                                                    {item.daily_rejected}/{item.total_rejected}
+                                                </td>
                                             </tr>
                                         ))
                                     )}
@@ -430,11 +326,18 @@ export default function ReportPage() {
                                             <td className="px-3 py-2" colSpan={2}>
                                                 <span className="font-bold text-foreground">TOTAL</span>
                                             </td>
-                                            <td className="px-2 py-2 text-center font-bold text-muted-foreground">{data.totals.target || '-'}</td>
-                                            <td className="px-2 py-2 text-center font-bold text-primary">{data.totals.input}</td>
-                                            <td className="px-2 py-2 text-center font-bold text-success">{data.totals.acc}</td>
-                                            <td className="px-2 py-2 text-center font-bold text-warning">{data.totals.pending}</td>
-                                            <td className="px-2 py-2 text-center font-bold text-destructive">{data.totals.reject}</td>
+                                            <td className="px-2 py-2 text-center font-bold text-primary font-mono text-xs">
+                                                {data.totals.daily_input}/{data.totals.total_input}/{data.totals.target || '-'}
+                                            </td>
+                                            <td className="px-2 py-2 text-center font-bold text-success font-mono text-xs">
+                                                {data.totals.daily_closed}/{data.totals.total_closed}
+                                            </td>
+                                            <td className="px-2 py-2 text-center font-bold text-warning font-mono text-xs">
+                                                {data.totals.daily_pending}/{data.totals.total_pending}
+                                            </td>
+                                            <td className="px-2 py-2 text-center font-bold text-destructive font-mono text-xs">
+                                                {data.totals.daily_rejected}/{data.totals.total_rejected}
+                                            </td>
                                         </tr>
                                     </tfoot>
                                 )}
@@ -443,7 +346,7 @@ export default function ReportPage() {
 
                         {/* Footer for image */}
                         <div className="bg-muted px-4 py-2 border-t text-center">
-                            <p className="text-muted-foreground text-xs">VAST Finance - {data?.supervisor}</p>
+                            <p className="text-muted-foreground text-xs">Format: Hari Ini / Total Bulan / Target</p>
                         </div>
                     </Card>
 

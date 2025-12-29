@@ -368,25 +368,29 @@ export default function ManagerPerformancePage() {
 
                 {/* Level Filter Tabs */}
                 <div className="px-4 py-3">
-                    <div className="flex h-9 w-full items-center justify-center rounded-lg bg-muted p-1">
-                        {['area', 'sator', 'promotor'].map((tab) => (
-                            <label key={tab} className="flex-1 cursor-pointer h-full">
+                    <div className="flex h-10 w-full items-center justify-center rounded-xl bg-muted p-1.5 gap-1">
+                        {[
+                            { key: 'area', label: 'AREA' },
+                            { key: 'sator', label: 'SATOR' },
+                            { key: 'promotor', label: 'PROMOTOR' }
+                        ].map((tab) => (
+                            <label key={tab.key} className="flex-1 cursor-pointer h-full">
                                 <input
                                     type="radio"
                                     name="view_level"
-                                    value={tab}
-                                    checked={activeTab === tab}
+                                    value={tab.key}
+                                    checked={activeTab === tab.key}
                                     onChange={() => {
-                                        if (tab === 'area') { setSelectedArea(null); setSelectedSator(null); }
-                                        setActiveTab(tab as TabLevel);
+                                        if (tab.key === 'area') { setSelectedArea(null); setSelectedSator(null); }
+                                        setActiveTab(tab.key as TabLevel);
                                     }}
                                     className="sr-only"
                                 />
                                 <div className={cn(
-                                    "flex items-center justify-center h-full rounded-md text-xs font-bold uppercase tracking-wide transition-all",
-                                    activeTab === tab ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                                    "flex items-center justify-center h-full rounded-lg text-xs font-bold tracking-wide transition-all",
+                                    activeTab === tab.key ? "bg-card text-foreground shadow-md" : "text-muted-foreground hover:text-foreground"
                                 )}>
-                                    {tab}
+                                    {tab.label}
                                 </div>
                             </label>
                         ))}
