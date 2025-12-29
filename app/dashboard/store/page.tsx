@@ -36,7 +36,7 @@ export default function StorePerformancePage() {
     const [satorTarget, setSatorTarget] = useState<number>(0);  // SATOR's admin-assigned target
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<'perform' | 'under'>('perform');
+    const [activeTab, setActiveTab] = useState<'allteam' | 'perform' | 'under'>('allteam');
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
     // Month navigation
@@ -129,13 +129,19 @@ export default function StorePerformancePage() {
     // Calculate performance
     const getPercent = (p: Promotor) => p.target > 0 ? Math.round((p.total_input / p.target) * 100) : 0;
     const isUnderperform = (p: Promotor) => {
-        if (p.target === 0) return true;
-        return getPercent(p) < timeGonePercent;
+        // Jika tidak ada input sama sekali = underperform
+        if (p.total_input === 0) return true;
+        // Jika ada target, cek pencapaian vs time gone
+        if (p.target > 0) {
+            return getPercent(p) < timeGonePercent;
+        }
+        // Jika tidak ada target tapi ada input = on track
+        return false;
     };
 
     const performPromotors = promotors.filter(p => !isUnderperform(p));
     const underPromotors = promotors.filter(p => isUnderperform(p));
-    const displayList = activeTab === 'perform' ? performPromotors : underPromotors;
+    const displayList = activeTab === 'allteam' ? promotors : activeTab === 'perform' ? performPromotors : underPromotors;
 
     // Totals - use SATOR's admin-assigned target, NOT sum of promotor targets
     const totals = promotors.reduce((acc, p) => ({
@@ -227,11 +233,10 @@ export default function StorePerformancePage() {
                         <button
                             onClick={goToNextMonth}
                             disabled={isCurrentMonth}
-                            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-                                isCurrentMonth
-                                    ? 'bg-muted text-muted-foreground cursor-not-allowed'
-                                    : 'bg-muted text-muted-foreground hover:bg-muted active:scale-95'
-                            }`}
+                            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isCurrentMonth
+                                ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                                : 'bg-muted text-muted-foreground hover:bg-muted active:scale-95'
+                                }`}
                         >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -256,16 +261,16 @@ export default function StorePerformancePage() {
                                 className={cn(
                                     "h-full rounded-full",
                                     totalPercent >= 100 ? 'bg-emerald-500' :
-                                    totalPercent >= timeGonePercent ? 'bg-amber-500' : 'bg-red-500'
+                                        totalPercent >= timeGonePercent ? 'bg-amber-500' : 'bg-red-500'
                                 )}
                                 style={{ width: `${Math.min(totalPercent, 100)}%` }}
                             />
                         </div>
                         <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>Capaian: <span className={cn(
-                                "font-semibold",
+                            <span>Pencapaian: <span className={cn(
+                                "text-lg font-bold",
                                 totalPercent >= 100 ? 'text-emerald-500' :
-                                totalPercent >= timeGonePercent ? 'text-amber-500' : 'text-red-500'
+                                    totalPercent >= timeGonePercent ? 'text-amber-500' : 'text-red-500'
                             )}>{totalPercent}%</span></span>
                             <span>Time Gone: <span className="font-semibold text-primary">{timeGonePercent}%</span></span>
                         </div>
@@ -274,35 +279,48 @@ export default function StorePerformancePage() {
                     {/* Tabs */}
                     <div className="flex gap-2">
                         <button
-                            onClick={() => setActiveTab('perform')}
-                            className={`flex-1 py-3 rounded-xl font-semibold text-sm transition-all ${
-                                activeTab === 'perform'
-                                    ? 'bg-primary text-primary-foreground shadow-md'
-                                    : 'bg-card text-muted-foreground shadow-md border border-border'
-                            }`}
+                            onClick={() => setActiveTab('allteam')}
+                            className={`flex-1 py-2.5 rounded-xl font-semibold text-xs transition-all ${activeTab === 'allteam'
+                                ? 'bg-primary text-primary-foreground shadow-md'
+                                : 'bg-card text-muted-foreground shadow-md border border-border'
+                                }`}
                         >
-                            <div className="flex items-center justify-center gap-2">
-                                <span>📊</span>
+                            <div className="flex items-center justify-center gap-1">
+                                <span>👥</span>
+                                <span>All Team</span>
+                            </div>
+                            <div className={`text-[10px] ${activeTab === 'allteam' ? 'text-primary-foreground/80' : 'text-primary'}`}>
+                                {promotors.length}
+                            </div>
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('perform')}
+                            className={`flex-1 py-2.5 rounded-xl font-semibold text-xs transition-all ${activeTab === 'perform'
+                                ? 'bg-emerald-500 text-white shadow-md'
+                                : 'bg-card text-muted-foreground shadow-md border border-border'
+                                }`}
+                        >
+                            <div className="flex items-center justify-center gap-1">
+                                <span>✅</span>
                                 <span>On Track</span>
                             </div>
-                            <div className={`text-xs ${activeTab === 'perform' ? 'text-emerald-300' : 'text-emerald-500'}`}>
-                                {performPromotors.length} orang
+                            <div className={`text-[10px] ${activeTab === 'perform' ? 'text-emerald-200' : 'text-emerald-500'}`}>
+                                {performPromotors.length}
                             </div>
                         </button>
                         <button
                             onClick={() => setActiveTab('under')}
-                            className={`flex-1 py-3 rounded-xl font-semibold text-sm transition-all ${
-                                activeTab === 'under'
-                                    ? 'bg-destructive text-primary-foreground shadow-md'
-                                    : 'bg-card text-muted-foreground shadow-md border border-border'
-                            }`}
+                            className={`flex-1 py-2.5 rounded-xl font-semibold text-xs transition-all ${activeTab === 'under'
+                                ? 'bg-destructive text-primary-foreground shadow-md'
+                                : 'bg-card text-muted-foreground shadow-md border border-border'
+                                }`}
                         >
-                            <div className="flex items-center justify-center gap-2">
+                            <div className="flex items-center justify-center gap-1">
                                 <span>📉</span>
                                 <span>Underperform</span>
                             </div>
-                            <div className={`text-xs ${activeTab === 'under' ? 'text-red-200' : 'text-red-500'}`}>
-                                {underPromotors.length} orang
+                            <div className={`text-[10px] ${activeTab === 'under' ? 'text-red-200' : 'text-red-500'}`}>
+                                {underPromotors.length}
                             </div>
                         </button>
                     </div>
@@ -310,75 +328,106 @@ export default function StorePerformancePage() {
                     {/* Promotor List */}
                     {displayList.length === 0 ? (
                         <div className="bg-card border border-border rounded-2xl shadow-xl p-8 text-center">
-                            <div className="text-5xl mb-3">{activeTab === 'perform' ? '😔' : '🎉'}</div>
-                            <h3 className="text-lg font-bold text-foreground mb-1">
-                                {activeTab === 'perform' ? 'Tidak ada yang on track' : 'Semua On Track!'}
+                            <div className="text-5xl mb-3">
+                                {activeTab === 'allteam' ? '📭' : activeTab === 'perform' ? '😔' : '🎉'}
+                            </div>
+                            <h3 className={`text-lg font-bold mb-1 ${activeTab === 'perform' ? 'text-red-600' :
+                                activeTab === 'under' ? 'text-emerald-600' : 'text-foreground'
+                                }`}>
+                                {activeTab === 'allteam' ? 'Tidak ada data' :
+                                    activeTab === 'perform' ? 'Semua Underperform!' :
+                                        'Semua On Track! 🎉'}
                             </h3>
                             <p className="text-sm text-muted-foreground">
-                                {activeTab === 'perform' ? 'Semua promotor underperform' : 'Tidak ada yang underperform'}
+                                {activeTab === 'allteam' ? 'Data belum tersedia untuk periode ini' :
+                                    activeTab === 'perform' ? 'Belum ada promotor yang mencapai target. Semangat!' :
+                                        'Tidak ada promotor yang underperform saat ini'}
                             </p>
                         </div>
                     ) : (
-                        <div className="bg-card border border-border rounded-2xl shadow-xl overflow-hidden">
-                            <div className={`px-4 py-2 flex justify-between items-center ${
-                                activeTab === 'perform' ? 'bg-emerald-500' : 'bg-red-500'
-                            }`}>
-                                <span className="text-white font-medium text-sm">
-                                    {activeTab === 'perform' ? 'Promotor On Track' : 'Promotor Underperform'}
-                                </span>
-                                <span className="text-white/80 text-xs">
-                                    {displayList.length} orang
-                                </span>
-                            </div>
+                        <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+                            <table className="w-full text-xs">
+                                <thead className={`${activeTab === 'allteam' ? 'bg-primary' :
+                                        activeTab === 'perform' ? 'bg-emerald-500' : 'bg-red-500'
+                                    }`}>
+                                    <tr>
+                                        <th className="py-2.5 pl-3 pr-2 text-left text-[10px] font-bold uppercase tracking-wider text-white">
+                                            Promotor
+                                        </th>
+                                        <th className="px-1.5 py-2.5 text-center text-[10px] font-bold uppercase tracking-wider text-white/80">Input</th>
+                                        {activeTab === 'under' ? (
+                                            <th className="px-1.5 py-2.5 text-center text-[10px] font-bold uppercase tracking-wider text-white/80">GAP</th>
+                                        ) : (
+                                            <>
+                                                <th className="px-1 py-2.5 text-center text-[10px] font-bold uppercase tracking-wider text-white/80">CLS</th>
+                                                <th className="px-1 py-2.5 text-center text-[10px] font-bold uppercase tracking-wider text-white/80">PND</th>
+                                                <th className="px-1 py-2.5 text-center text-[10px] font-bold uppercase tracking-wider text-white/80">REJ</th>
+                                            </>
+                                        )}
+                                        <th className="px-2 py-2.5 text-right text-[10px] font-bold uppercase tracking-wider text-white/80">%</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border">
+                                    {displayList.map((p) => {
+                                        const pct = getPercent(p);
+                                        const gap = Math.max(0, p.target - p.total_input);
+                                        const under = isUnderperform(p);
 
-                            <div className="divide-y divide-border">
-                                {displayList.map((p) => {
-                                    const pct = getPercent(p);
-                                    const kurang = Math.max(0, p.target - p.total_input);
-
-                                    return (
-                                        <div key={p.user_id} className="px-4 py-3">
-                                            {/* Row 1: Nama & Input */}
-                                            <div className="flex justify-between items-center mb-1">
-                                                <span className="font-semibold text-foreground">{p.name}</span>
-                                                <span className={`text-xl font-bold ${activeTab === 'perform' ? 'text-emerald-500' : 'text-red-500'}`}>
-                                                    {p.total_input}
-                                                </span>
-                                            </div>
-
-                                            {/* Row 2: Stats */}
-                                            <div className="flex justify-between items-center text-xs mb-2">
-                                                <div className="flex gap-3">
-                                                    <span className="text-muted-foreground">
-                                                        Target: <span className="font-medium">{p.target || '-'}</span>
-                                                    </span>
-                                                    <span className={pct >= timeGonePercent ? 'text-emerald-500' : 'text-red-500'}>
-                                                        {pct}%
-                                                    </span>
-                                                </div>
-                                                <span className="text-red-500 font-medium">
-                                                    Kurang: {kurang}
-                                                </span>
-                                            </div>
-
-                                            {/* Row 3: Detail */}
-                                            <div className="flex gap-3 text-xs mb-2">
-                                                <span className="text-emerald-500">{p.total_closed} ACC</span>
-                                                <span className="text-amber-500">{p.total_pending} Pnd</span>
-                                                <span className="text-red-500">{p.total_rejected} Rej</span>
-                                            </div>
-
-                                            {/* Progress Bar */}
-                                            <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
-                                                <div
-                                                    className={`h-full rounded-full ${activeTab === 'perform' ? 'bg-emerald-500' : 'bg-red-500'}`}
-                                                    style={{ width: `${Math.min(pct, 100)}%` }}
-                                                />
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
+                                        return (
+                                            <tr
+                                                key={p.user_id}
+                                                className={`transition-colors ${under && activeTab === 'under' ? 'bg-red-500/5 hover:bg-red-500/10' : 'hover:bg-muted/30'
+                                                    }`}
+                                            >
+                                                <td className="py-2.5 pl-3 pr-2">
+                                                    <div className="flex items-center gap-1.5">
+                                                        {under && activeTab === 'under' && (
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
+                                                        )}
+                                                        <div className="flex flex-col min-w-0">
+                                                            <span className="font-bold text-foreground truncate">{p.name.split(' ')[0]}</span>
+                                                            {p.target === 0 ? (
+                                                                <span className="text-[9px] text-amber-600 font-medium">⚠️ No Target</span>
+                                                            ) : (
+                                                                <span className="text-[9px] text-muted-foreground">Target: {p.target}</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-1.5 py-2.5 text-center">
+                                                    <div className="font-bold text-foreground">{p.total_input}</div>
+                                                </td>
+                                                {activeTab === 'under' ? (
+                                                    <td className="px-1.5 py-2.5 text-center">
+                                                        <div className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black ${gap >= 10 ? 'bg-red-500 text-white' : 'bg-red-100 text-red-600'
+                                                            }`}>
+                                                            -{gap}
+                                                        </div>
+                                                    </td>
+                                                ) : (
+                                                    <>
+                                                        <td className="px-1 py-2.5 text-center font-bold text-[11px] text-emerald-500">{p.total_closed}</td>
+                                                        <td className="px-1 py-2.5 text-center font-bold text-[11px] text-amber-500">{p.total_pending}</td>
+                                                        <td className="px-1 py-2.5 text-center font-bold text-[11px] text-red-500">{p.total_rejected}</td>
+                                                    </>
+                                                )}
+                                                <td className="px-2 py-2.5 text-right">
+                                                    <div className={`font-black text-[11px] ${pct >= 100 ? 'text-emerald-500' : pct >= timeGonePercent ? 'text-amber-500' : 'text-red-500'
+                                                        }`}>{pct}%</div>
+                                                    {p.target > 0 && (
+                                                        <div className="mt-1 w-10 ml-auto bg-muted rounded-full h-1 overflow-hidden">
+                                                            <div
+                                                                className={`h-full rounded-full ${pct >= 100 ? 'bg-emerald-500' : pct >= timeGonePercent ? 'bg-amber-500' : 'bg-red-500'}`}
+                                                                style={{ width: `${Math.min(pct, 100)}%` }}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
                         </div>
                     )}
 

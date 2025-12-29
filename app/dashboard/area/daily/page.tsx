@@ -77,14 +77,11 @@ interface Submission {
     image_urls: string[];
 }
 
-type FilterType = 'all' | 'empty' | 'reject';
-
 export default function ManagerDailyPage() {
     const { user } = useAuth();
     const [data, setData] = useState<DailyData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [filter, setFilter] = useState<FilterType>('all');
     const [selectedArea, setSelectedArea] = useState<string>('all');
 
     // Modal state for promotor list
@@ -167,26 +164,10 @@ export default function ManagerDailyPage() {
     if (error) return <DashboardLayout><Alert type="error" message={error} /></DashboardLayout>;
     if (!data) return <DashboardLayout><Alert type="error" message="Data tidak tersedia" /></DashboardLayout>;
 
-    // Filter logic
-    const filterPromotor = (p: Promotor): boolean => {
-        if (filter === 'empty') return p.is_empty;
-        if (filter === 'reject') return p.has_reject;
-        return true;
-    };
-
+    // Filter by selected area only
     const getFilteredAreas = (): Area[] => {
-        let areas = data.areas;
-        if (selectedArea !== 'all') {
-            areas = areas.filter(a => a.user_id === selectedArea);
-        }
-        if (filter === 'all') return areas;
-        return areas.map(area => ({
-            ...area,
-            sators: area.sators.map(sator => ({
-                ...sator,
-                promotors: sator.promotors.filter(filterPromotor)
-            })).filter(sator => sator.promotors.length > 0)
-        })).filter(area => area.sators.length > 0);
+        if (selectedArea === 'all') return data.areas;
+        return data.areas.filter(a => a.user_id === selectedArea);
     };
 
     const filteredAreas = getFilteredAreas();
@@ -313,45 +294,15 @@ export default function ManagerDailyPage() {
                         <div className="flex gap-4 text-[11px]">
                             <span className="text-success/80">{selectedStats.active} aktif</span>
                             <span className="text-destructive/80">{selectedStats.empty} kosong</span>
-                            <span className="text-primary-foreground/80 ml-auto">{selectedStats.total} promotor</span>
                         </div>
-                    </div>
-
-                    {/* Quick Filter - Compact */}
-                    <div className="flex gap-1.5 mb-3">
-                        <button
-                            onClick={() => setFilter('all')}
-                            className={`flex-1 py-2 rounded-xl text-xs font-medium transition-all ${filter === 'all' ? 'bg-secondary text-primary-foreground' : 'bg-card text-muted-foreground shadow-md'
-                                }`}
-                        >
-                            Semua
-                        </button>
-                        <button
-                            onClick={() => setFilter('empty')}
-                            className={`flex-1 py-2 rounded-xl text-xs font-medium transition-all flex items-center justify-center gap-1 ${filter === 'empty' ? 'bg-destructive/100 text-primary-foreground' : 'bg-card text-muted-foreground shadow-md'
-                                }`}
-                        >
-                            Kosong <span className={`text-[10px] ${filter === 'empty' ? 'text-destructive/80' : 'text-destructive'}`}>({selectedStats.empty})</span>
-                        </button>
-                        <button
-                            onClick={() => setFilter('reject')}
-                            className={`flex-1 py-2 rounded-xl text-xs font-medium transition-all flex items-center justify-center gap-1 ${filter === 'reject' ? 'bg-warning/100 text-primary-foreground' : 'bg-card text-muted-foreground shadow-md'
-                                }`}
-                        >
-                            Reject <span className={`text-[10px] ${filter === 'reject' ? 'text-warning/80' : 'text-warning'}`}>({selectedStats.with_reject})</span>
-                        </button>
                     </div>
 
                     {/* Areas List */}
                     {filteredAreas.length === 0 ? (
                         <div className="bg-card rounded-2xl p-12 text-center shadow-xl border border-dashed border-border">
-                            <div className="text-5xl mb-4">
-                                {filter === 'empty' ? '🎉' : filter === 'reject' ? '✅' : '📭'}
-                            </div>
-                            <h3 className="text-lg font-bold text-foreground">
-                                {filter === 'empty' ? 'Semua sudah input!' : filter === 'reject' ? 'Tidak ada reject' : 'Belum ada data'}
-                            </h3>
-                            <p className="text-muted-foreground text-sm mt-1">Data harian tidak ditemukan untuk filter ini.</p>
+                            <div className="text-5xl mb-4">📭</div>
+                            <h3 className="text-lg font-bold text-foreground">Belum ada data</h3>
+                            <p className="text-muted-foreground text-sm mt-1">Data harian tidak ditemukan.</p>
                         </div>
                     ) : (
                         <div className="space-y-4">

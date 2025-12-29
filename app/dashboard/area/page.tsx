@@ -299,44 +299,46 @@ export default function ManagerDashboardPage() {
                                         return (
                                             <div
                                                 key={idx}
-                                                className="px-5 py-5 group hover:bg-muted/30 transition-all cursor-pointer"
+                                                className="px-5 py-4 group hover:bg-muted/30 transition-all cursor-pointer"
                                                 onClick={() => router.push('/dashboard/area/performance')}
                                             >
-                                                {/* Row 1: Area Name & Total Input */}
-                                                <div className="flex justify-between items-center mb-1">
+                                                {/* Row 1: Area Name & Pencapaian */}
+                                                <div className="flex justify-between items-start mb-3">
                                                     <div>
                                                         <h4 className="text-lg font-bold text-foreground leading-tight">{area.name}</h4>
                                                         <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">{area.spv_name}</p>
                                                     </div>
                                                     <div className="text-right">
-                                                        <span className="text-3xl font-black text-primary leading-none">{area.total_input}</span>
-                                                        <p className="text-[9px] text-muted-foreground font-bold uppercase leading-none mt-1">TOTAL INPUT</p>
-                                                    </div>
-                                                </div>
-
-                                                {/* Row 2: Progress Metrics */}
-                                                <div className="flex justify-between items-center text-xs mb-3">
-                                                    <div className="flex gap-3">
-                                                        <span className="text-muted-foreground text-[10px]">
-                                                            Target: <span className="font-bold text-foreground">{area.target}</span>
-                                                        </span>
-                                                        <span className={cn(
-                                                            "font-bold text-[10px]",
+                                                        <div className={cn(
+                                                            "text-2xl font-bold",
                                                             pct >= 100 ? 'text-emerald-500' :
                                                                 pct >= timeGonePercent ? 'text-amber-500' : 'text-red-500'
                                                         )}>
                                                             {pct}%
+                                                        </div>
+                                                        <p className="text-[10px] text-muted-foreground font-semibold uppercase">Pencapaian</p>
+                                                    </div>
+                                                </div>
+
+                                                {/* Row 2: Stats */}
+                                                <div className="flex justify-between items-center text-xs mb-2">
+                                                    <div className="flex gap-4">
+                                                        <span className="text-muted-foreground">
+                                                            Input: <span className="font-bold text-primary">{area.total_input}</span>
+                                                        </span>
+                                                        <span className="text-muted-foreground">
+                                                            Target: <span className="font-bold text-foreground">{area.target}</span>
                                                         </span>
                                                     </div>
                                                     {gap > 0 ? (
-                                                        <span className="text-red-500 font-bold text-[10px]">Gap: -{gap}</span>
+                                                        <span className="text-red-500 font-bold">Gap: -{gap}</span>
                                                     ) : (
-                                                        <span className="text-emerald-500 font-bold text-[10px]">DONE!</span>
+                                                        <span className="text-emerald-500 font-bold">✓ DONE</span>
                                                     )}
                                                 </div>
 
                                                 {/* Row 3: Progress Bar */}
-                                                <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                                                <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                                                     <div
                                                         className={cn(
                                                             "h-full rounded-full transition-all duration-500",

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
@@ -8,8 +8,19 @@ import { ProfileSidebar } from '@/components/ProfileSidebar';
 import { Loading } from '@/components/ui/loading';
 import { Alert } from '@/components/ui/alert';
 import { createClient } from '@/lib/supabase/client';
-import { Bell, User, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Bell, User, Calendar, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import html2canvas from 'html2canvas';
+
+interface PromotorData {
+    user_id: string;
+    name: string;
+    target?: number;
+    total_input: number;
+    total_closed: number;
+    total_pending: number;
+    total_rejected: number;
+}
 
 interface StoreData {
     store_id: string;
@@ -20,6 +31,7 @@ interface StoreData {
     total_closed: number;
     total_pending: number;
     total_rejected: number;
+    promotors?: PromotorData[];
 }
 
 // Whitelist akses SPC (hardcoded)
@@ -58,6 +70,10 @@ export default function SPCDashboardPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [exporting, setExporting] = useState(false);
+
+    // Ref untuk PNG template
+    const reportRef = useRef<HTMLDivElement>(null);
 
     // View mode: daily or monthly
     const [viewMode, setViewMode] = useState<'daily' | 'monthly'>('monthly');
@@ -191,6 +207,38 @@ export default function SPCDashboardPage() {
 
     const totalPercent = totals.target > 0 ? Math.round((totals.input / totals.target) * 100) : 0;
 
+    // Period label untuk export
+    const periodLabel = viewMode === 'daily'
+        ? `${selectedDate.day}/${selectedDate.month + 1}/${selectedDate.year}`
+        : `${getMonthName(selectedDate.month).toUpperCase()} ${selectedDate.year}`;
+
+    // Handle Export PNG
+    const handleExportPNG = async () => {
+        if (!reportRef.current || exporting) return;
+
+        setExporting(true);
+        try {
+            const canvas = await html2canvas(reportRef.current, {
+                backgroundColor: '#ffffff',
+                scale: 2,
+                logging: false,
+                useCORS: true,
+                allowTaint: true,
+                removeContainer: true
+            });
+            const link = document.createElement('a');
+            const dateStr = new Date().toISOString().slice(0, 10);
+            link.download = `SPC_GRUP_${user?.name || 'Report'}_${dateStr}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        } catch (err) {
+            console.error('Export error:', err);
+            alert('Gagal export PNG');
+        } finally {
+            setExporting(false);
+        }
+    };
+
     if (!user || !canAccessSPC(user)) {
         return <DashboardLayout><Loading message="Memeriksa akses..." /></DashboardLayout>;
     }
@@ -219,6 +267,23 @@ export default function SPCDashboardPage() {
                             </div>
                         </button>
                         <div className="flex items-center gap-2">
+                            <button
+                                onClick={handleExportPNG}
+                                disabled={exporting || stores.length === 0}
+                                className={cn(
+                                    "flex items-center justify-center h-10 px-3 gap-2 rounded-full transition-colors text-white",
+                                    exporting || stores.length === 0
+                                        ? "bg-white/10 opacity-50"
+                                        : "bg-white/10 hover:bg-white/20"
+                                )}
+                            >
+                                {exporting ? (
+                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                ) : (
+                                    <Download className="w-4 h-4" />
+                                )}
+                                <span className="text-xs font-semibold">PNG</span>
+                            </button>
                             <button className="flex items-center justify-center h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white">
                                 <Bell className="w-5 h-5" />
                             </button>
@@ -382,12 +447,15 @@ export default function SPCDashboardPage() {
                                             {/* Row 1: Nama & Input */}
                                             <div className="flex justify-between items-center mb-1">
                                                 <span className="font-semibold text-foreground">{store.store_name}</span>
-                                                <span className={cn(
-                                                    "text-xl font-bold",
-                                                    viewMode === 'monthly' && under ? 'text-red-500' : 'text-primary'
-                                                )}>
-                                                    {store.total_input}
-                                                </span>
+                                                <div className="text-right">
+                                                    <div className="text-[10px] text-muted-foreground font-medium uppercase">Total Inputan</div>
+                                                    <span className={cn(
+                                                        "text-xl font-bold",
+                                                        viewMode === 'monthly' && under ? 'text-red-500' : 'text-primary'
+                                                    )}>
+                                                        {store.total_input}
+                                                    </span>
+                                                </div>
                                             </div>
 
                                             {/* Row 2: Stats */}
@@ -396,10 +464,10 @@ export default function SPCDashboardPage() {
                                                     {viewMode === 'monthly' && (
                                                         <>
                                                             <span className="text-muted-foreground">
-                                                                Target: <span className="font-medium">{store.target || '-'}</span>
+                                                                Target Toko: <span className="font-medium">{store.target || '-'}</span>
                                                             </span>
                                                             <span className={pct >= timeGonePercent ? 'text-emerald-500' : 'text-red-500'}>
-                                                                {pct}%
+                                                                Pencapaian: {pct}%
                                                             </span>
                                                         </>
                                                     )}
@@ -416,7 +484,7 @@ export default function SPCDashboardPage() {
 
                                             {/* Progress Bar (monthly only) */}
                                             {viewMode === 'monthly' && (
-                                                <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                                                <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden mb-3">
                                                     <div
                                                         className={cn(
                                                             "h-full rounded-full",
@@ -424,6 +492,54 @@ export default function SPCDashboardPage() {
                                                         )}
                                                         style={{ width: `${Math.min(pct, 100)}%` }}
                                                     />
+                                                </div>
+                                            )}
+
+                                            {/* Detail Promotor */}
+                                            {store.promotors && store.promotors.length > 0 && (
+                                                <div className="mt-3 pt-3 border-t border-border/50">
+                                                    <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
+                                                        📋 Promotor ({store.promotors.length})
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        {store.promotors.map((promotor) => {
+                                                            const promotorPct = viewMode === 'monthly' && promotor.target
+                                                                ? Math.round((promotor.total_input / promotor.target) * 100)
+                                                                : 0;
+                                                            const promotorUnder = viewMode === 'monthly' && promotor.target
+                                                                ? promotorPct < timeGonePercent
+                                                                : false;
+
+                                                            return (
+                                                                <div key={promotor.user_id} className="flex justify-between items-center text-xs bg-muted/30 rounded-lg px-3 py-2">
+                                                                    <div className="flex-1">
+                                                                        <span className="font-medium text-foreground">{promotor.name}</span>
+                                                                        {viewMode === 'monthly' && (
+                                                                            <span className="text-muted-foreground ml-2">
+                                                                                Target: <span className="font-semibold">{promotor.target || 0}</span>
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className={cn(
+                                                                            "font-bold",
+                                                                            viewMode === 'monthly' && promotorUnder ? 'text-red-500' : 'text-primary'
+                                                                        )}>
+                                                                            {promotor.total_input}
+                                                                        </span>
+                                                                        {viewMode === 'monthly' && promotor.target && (
+                                                                            <span className={cn(
+                                                                                "text-[10px] font-semibold",
+                                                                                promotorUnder ? 'text-red-500' : 'text-emerald-500'
+                                                                            )}>
+                                                                                {promotorPct}%
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -439,6 +555,113 @@ export default function SPCDashboardPage() {
 
                 {/* Profile Sidebar */}
                 <ProfileSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+            </div>
+
+            {/* Hidden PNG Template for Export */}
+            <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+                <div ref={reportRef} style={{ width: '600px', padding: '24px', backgroundColor: '#ffffff', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                    {/* Header SPC */}
+                    <div style={{ marginBottom: '24px' }}>
+                        <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: '#7c3aed', margin: '0 0 8px 0' }}>SPC GRUP</h1>
+                        <div style={{ fontSize: '13px', color: '#374151', lineHeight: '1.6' }}>
+                            <div><strong>AREA:</strong> TIMOR-SUMBA</div>
+                            <div><strong>{user?.role === 'sator' ? 'SATOR' : user?.role === 'spv' ? 'SPV' : 'MANAGER'}:</strong> {user?.name || 'N/A'}</div>
+                            <div><strong>PERIODE:</strong> {periodLabel}</div>
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '8px' }}>
+                            Jumat, {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })} | Time Gone: {timeGonePercent}%
+                        </div>
+                    </div>
+
+                    {/* Table Performance Toko */}
+                    <div style={{ marginBottom: '24px' }}>
+                        <div style={{ backgroundColor: '#7c3aed', color: '#ffffff', padding: '10px 16px', fontSize: '13px', fontWeight: 'bold', borderRadius: '8px 8px 0 0' }}>
+                            PERFORMANCE TOKO ({stores.length} Toko)
+                        </div>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                            <thead>
+                                <tr style={{ backgroundColor: '#f3e8ff' }}>
+                                    <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 'bold', color: '#6b21a8', borderBottom: '2px solid #c4b5fd' }}>TOKO</th>
+                                    <th style={{ padding: '10px 8px', textAlign: 'center', fontWeight: 'bold', color: '#6b21a8', borderBottom: '2px solid #c4b5fd' }}>TARGET</th>
+                                    <th style={{ padding: '10px 8px', textAlign: 'center', fontWeight: 'bold', color: '#6b21a8', borderBottom: '2px solid #c4b5fd' }}>INPUT (H/T)</th>
+                                    <th style={{ padding: '10px 8px', textAlign: 'center', fontWeight: 'bold', color: '#6b21a8', borderBottom: '2px solid #c4b5fd' }}>%</th>
+                                    <th style={{ padding: '10px 8px', textAlign: 'center', fontWeight: 'bold', color: '#059669', borderBottom: '2px solid #c4b5fd' }}>CLO</th>
+                                    <th style={{ padding: '10px 8px', textAlign: 'center', fontWeight: 'bold', color: '#d97706', borderBottom: '2px solid #c4b5fd' }}>PND</th>
+                                    <th style={{ padding: '10px 8px', textAlign: 'center', fontWeight: 'bold', color: '#dc2626', borderBottom: '2px solid #c4b5fd' }}>REJ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {stores.map((store, idx) => {
+                                    const pct = getPercent(store);
+                                    return (
+                                        <tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#faf5ff' }}>
+                                            <td style={{ padding: '8px 12px', fontWeight: '600', color: '#581c87', borderBottom: '1px solid #e9d5ff' }}>{store.store_name}</td>
+                                            <td style={{ padding: '8px', textAlign: 'center', fontFamily: 'monospace', color: '#7c3aed', borderBottom: '1px solid #e9d5ff' }}>{store.target || 0}</td>
+                                            <td style={{ padding: '8px', textAlign: 'center', fontFamily: 'monospace', fontWeight: 'bold', color: '#7c3aed', borderBottom: '1px solid #e9d5ff' }}>0/{store.total_input}</td>
+                                            <td style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold', color: pct >= timeGonePercent ? '#059669' : '#dc2626', borderBottom: '1px solid #e9d5ff' }}>{pct}%</td>
+                                            <td style={{ padding: '8px', textAlign: 'center', fontFamily: 'monospace', color: '#059669', borderBottom: '1px solid #e9d5ff' }}>0/{store.total_closed}</td>
+                                            <td style={{ padding: '8px', textAlign: 'center', fontFamily: 'monospace', color: '#d97706', borderBottom: '1px solid #e9d5ff' }}>0/{store.total_pending}</td>
+                                            <td style={{ padding: '8px', textAlign: 'center', fontFamily: 'monospace', color: '#dc2626', borderBottom: '1px solid #e9d5ff' }}>0/{store.total_rejected}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Table Detail Per Promotor */}
+                    <div style={{ marginBottom: '24px' }}>
+                        <div style={{ backgroundColor: '#6b21a8', color: '#ffffff', padding: '10px 16px', fontSize: '13px', fontWeight: 'bold', borderRadius: '8px 8px 0 0' }}>
+                            DETAIL PER PROMOTOR
+                        </div>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
+                            <thead>
+                                <tr style={{ backgroundColor: '#ede9fe' }}>
+                                    <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 'bold', color: '#581c87', borderBottom: '2px solid #c4b5fd' }}>TOKO</th>
+                                    <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 'bold', color: '#581c87', borderBottom: '2px solid #c4b5fd' }}>PROMOTOR</th>
+                                    <th style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold', color: '#581c87', borderBottom: '2px solid #c4b5fd' }}>TARGET</th>
+                                    <th style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold', color: '#581c87', borderBottom: '2px solid #c4b5fd' }}>INPUT (H/T)</th>
+                                    <th style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold', color: '#581c87', borderBottom: '2px solid #c4b5fd' }}>%</th>
+                                    <th style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold', color: '#059669', borderBottom: '2px solid #c4b5fd' }}>CLO</th>
+                                    <th style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold', color: '#d97706', borderBottom: '2px solid #c4b5fd' }}>PND</th>
+                                    <th style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold', color: '#dc2626', borderBottom: '2px solid #c4b5fd' }}>REJ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {stores.map((store, storeIdx) => {
+                                    if (!store.promotors || store.promotors.length === 0) {
+                                        return (
+                                            <tr key={`st-${storeIdx}`} style={{ backgroundColor: '#fefce8' }}>
+                                                <td style={{ padding: '6px 12px', color: '#7c3aed', borderBottom: '1px solid #e9d5ff' }}>{store.store_name}</td>
+                                                <td colSpan={7} style={{ padding: '6px 12px', textAlign: 'center', fontStyle: 'italic', color: '#9ca3af', borderBottom: '1px solid #e9d5ff' }}>(Tidak ada promotor)</td>
+                                            </tr>
+                                        );
+                                    }
+                                    return store.promotors.map((promotor, promIdx) => {
+                                        const promPct = promotor.target && promotor.target > 0 ? Math.round((promotor.total_input / promotor.target) * 100) : 0;
+                                        return (
+                                            <tr key={`${storeIdx}-${promIdx}`} style={{ backgroundColor: storeIdx % 2 === 0 ? '#ffffff' : '#faf5ff' }}>
+                                                <td style={{ padding: '6px 12px', color: '#7c3aed', fontSize: '9px', borderBottom: '1px solid #e9d5ff' }}>{promIdx === 0 ? store.store_name : ''}</td>
+                                                <td style={{ padding: '6px 12px', fontWeight: 'bold', color: '#581c87', borderBottom: '1px solid #e9d5ff' }}>{promotor.name}</td>
+                                                <td style={{ padding: '6px 8px', textAlign: 'center', fontFamily: 'monospace', color: '#7c3aed', borderBottom: '1px solid #e9d5ff' }}>{promotor.target || 0}</td>
+                                                <td style={{ padding: '6px 8px', textAlign: 'center', fontFamily: 'monospace', fontWeight: 'bold', color: '#7c3aed', borderBottom: '1px solid #e9d5ff' }}>0/{promotor.total_input}</td>
+                                                <td style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 'bold', color: promPct >= timeGonePercent ? '#059669' : '#dc2626', borderBottom: '1px solid #e9d5ff' }}>{promPct}%</td>
+                                                <td style={{ padding: '6px 8px', textAlign: 'center', fontFamily: 'monospace', color: '#059669', borderBottom: '1px solid #e9d5ff' }}>0/{promotor.total_closed}</td>
+                                                <td style={{ padding: '6px 8px', textAlign: 'center', fontFamily: 'monospace', color: '#d97706', borderBottom: '1px solid #e9d5ff' }}>0/{promotor.total_pending}</td>
+                                                <td style={{ padding: '6px 8px', textAlign: 'center', fontFamily: 'monospace', color: '#dc2626', borderBottom: '1px solid #e9d5ff' }}>0/{promotor.total_rejected}</td>
+                                            </tr>
+                                        );
+                                    });
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Footer */}
+                    <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ fontSize: '9px', color: '#9ca3af' }}>Generated by SMARA System | Time Gone: {timeGonePercent}%</div>
+                    </div>
+                </div>
             </div>
         </DashboardLayout>
     );

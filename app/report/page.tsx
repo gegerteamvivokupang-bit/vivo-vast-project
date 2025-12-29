@@ -184,18 +184,25 @@ export default function ReportPage() {
             text += `🏆 *LEADERBOARD:*\n`;
             data.leaderboard.forEach((item, index) => {
                 const emoji = getRankEmoji(index);
-                let line = `${emoji} ${formatFirstName(item.name)} - ${item.input} input`;
-                if (item.acc > 0 || item.reject > 0) {
-                    const parts = [];
-                    if (item.acc > 0) parts.push(`${item.acc} ACC`);
-                    if (item.pending > 0) parts.push(`${item.pending} PND`);
-                    if (item.reject > 0) parts.push(`${item.reject} REJ`);
-                    line += ` (${parts.join(', ')})`;
-                }
-                text += line + '\n';
+                // Format: 🥇 Nama : 5 Input (1 ACC, 2 PND, 0 REJ)
+                let detail = [];
+                if (item.acc > 0) detail.push(`${item.acc}✅`);
+                if (item.pending > 0) detail.push(`${item.pending}⏳`);
+                if (item.reject > 0) detail.push(`${item.reject}❌`);
+
+                const detailStr = detail.length > 0 ? `(${detail.join(' ')})` : '';
+
+                text += `${emoji} *${formatFirstName(item.name)}* : ${item.input} 📥 ${detailStr}\n`;
             });
         }
-        text += `\n📈 *TOTAL:* ${data.totals.input} Input | ${data.totals.acc} ACC | ${data.totals.pending} Pending | ${data.totals.reject} Reject`;
+
+        text += `\n══════════════════\n`;
+        text += `📈 *TOTAL ${isMonthly ? 'BULAN INI' : 'HARI INI'}*\n`;
+        text += `📥 Input   : ${data.totals.input}\n`;
+        text += `✅ ACC     : ${data.totals.acc}\n`;
+        text += `⏳ Pending : ${data.totals.pending}\n`;
+        text += `❌ Reject  : ${data.totals.reject}`;
+
         return text;
     };
 

@@ -111,9 +111,16 @@ export const NAV_CONFIG: Record<UserRole, NavItem[]> = {
             description: 'Dashboard tim toko'
         },
         {
+            key: 'daily',
+            label: 'Harian',
+            icon: '📅',
+            path: '/dashboard/team/daily',
+            description: 'Progress Hari Ini'
+        },
+        {
             key: 'store',
-            label: 'Perform',
-            icon: '📊',
+            label: 'Tim',
+            icon: '👥',
             path: '/dashboard/store',
             description: 'Performance Promotor'
         },
@@ -130,13 +137,6 @@ export const NAV_CONFIG: Record<UserRole, NavItem[]> = {
             icon: '📋',
             path: '/report',
             description: 'Laporan toko'
-        },
-        {
-            key: 'profile',
-            label: 'Profile',
-            icon: '👤',
-            path: '/profile',
-            description: 'Profil & logout'
         }
     ],
 
@@ -152,6 +152,13 @@ export const NAV_CONFIG: Record<UserRole, NavItem[]> = {
             icon: '🏠',
             path: '/dashboard/area',
             description: 'Overview semua AREA'
+        },
+        {
+            key: 'daily',
+            label: 'Harian',
+            icon: '📊',
+            path: '/dashboard/area/daily',
+            description: 'Progress Hari Ini'
         },
         {
             key: 'performance',

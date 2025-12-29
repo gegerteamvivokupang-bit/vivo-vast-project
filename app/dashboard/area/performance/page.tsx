@@ -25,7 +25,7 @@ interface Member {
 }
 
 type TabLevel = 'area' | 'sator' | 'promotor';
-type ViewMode = 'all' | 'underperform';
+type ViewMode = 'all' | 'ontrack' | 'underperform';
 
 export default function ManagerPerformancePage() {
     const { user } = useAuth();
@@ -92,10 +92,14 @@ export default function ManagerPerformancePage() {
     };
 
     const isUnderperform = (m: Member): boolean => {
-        const t = m.target || 0;
-        const i = m.total_input || 0;
-        if (t === 0) return i === 0;
-        return (i / t) * 100 < timeGonePercent;
+        // Jika tidak ada input sama sekali = underperform
+        if (m.total_input === 0) return true;
+        // Jika ada target, cek pencapaian vs time gone
+        if (m.target > 0) {
+            return (m.total_input / m.target) * 100 < timeGonePercent;
+        }
+        // Jika tidak ada target tapi ada input = on track
+        return false;
     };
 
     const handleAreaClick = (area: Member) => {
@@ -121,11 +125,15 @@ export default function ManagerPerformancePage() {
         let satorData = sators;
         let promotorData = promotors;
 
-        // Apply underperform filter if needed
+        // Apply filter based on viewMode
         if (viewMode === 'underperform') {
             areaData = areas.filter(isUnderperform);
             satorData = sators.filter(isUnderperform);
             promotorData = promotors.filter(isUnderperform);
+        } else if (viewMode === 'ontrack') {
+            areaData = areas.filter(m => !isUnderperform(m));
+            satorData = sators.filter(m => !isUnderperform(m));
+            promotorData = promotors.filter(m => !isUnderperform(m));
         }
 
         // Apply drill-down filters
@@ -240,25 +248,40 @@ export default function ManagerPerformancePage() {
                         <button
                             onClick={() => { setViewMode('all'); setSelectedArea(null); setSelectedSator(null); setActiveTab('area'); }}
                             className={cn(
-                                "flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition-all",
+                                "flex-1 flex items-center justify-center gap-1 rounded-lg py-2 text-xs font-semibold transition-all",
                                 viewMode === 'all' ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                             )}
                         >
-                            <Users className="w-4 h-4" />
-                            All Team
+                            <Users className="w-3.5 h-3.5" />
+                            All
+                        </button>
+                        <button
+                            onClick={() => { setViewMode('ontrack'); setSelectedArea(null); setSelectedSator(null); setActiveTab('area'); }}
+                            className={cn(
+                                "flex-1 flex items-center justify-center gap-1 rounded-lg py-2 text-xs font-semibold transition-all",
+                                viewMode === 'ontrack' ? "bg-emerald-500 text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            ✅ Track
+                            <span className={cn(
+                                "px-1.5 py-0.5 rounded-full text-[10px] font-bold",
+                                viewMode === 'ontrack' ? "bg-white/20 text-white" : "bg-emerald-500/20 text-emerald-500"
+                            )}>
+                                {areas.filter(m => !isUnderperform(m)).length + sators.filter(m => !isUnderperform(m)).length + promotors.filter(m => !isUnderperform(m)).length}
+                            </span>
                         </button>
                         <button
                             onClick={() => { setViewMode('underperform'); setSelectedArea(null); setSelectedSator(null); setActiveTab('area'); }}
                             className={cn(
-                                "flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition-all",
+                                "flex-1 flex items-center justify-center gap-1 rounded-lg py-2 text-xs font-semibold transition-all",
                                 viewMode === 'underperform' ? "bg-red-500 text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
                             )}
                         >
-                            <TrendingDown className="w-4 h-4" />
-                            Underperform
+                            <TrendingDown className="w-3.5 h-3.5" />
+                            Under
                             {totalUnderCount > 0 && (
                                 <span className={cn(
-                                    "px-1.5 py-0.5 rounded-full text-xs font-bold",
+                                    "px-1.5 py-0.5 rounded-full text-[10px] font-bold",
                                     viewMode === 'underperform' ? "bg-white/20 text-white" : "bg-red-500/20 text-red-500"
                                 )}>
                                     {totalUnderCount}
@@ -374,13 +397,29 @@ export default function ManagerPerformancePage() {
                 <div className="flex-1 overflow-x-auto px-4 pb-24">
                     {currentData.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12 gap-4 text-center bg-card rounded-xl border border-border">
-                            <div className={cn("p-6 rounded-full", viewMode === 'underperform' ? "bg-emerald-500/10" : "bg-muted")}>
-                                <span className="text-4xl">{viewMode === 'underperform' ? '🎉' : '📭'}</span>
+                            <div className={cn(
+                                "p-6 rounded-full",
+                                viewMode === 'underperform' ? "bg-emerald-500/10" :
+                                    viewMode === 'ontrack' ? "bg-red-500/10" : "bg-muted"
+                            )}>
+                                <span className="text-4xl">
+                                    {viewMode === 'underperform' ? '🎉' : viewMode === 'ontrack' ? '😔' : '📭'}
+                                </span>
                             </div>
                             <div>
-                                <h3 className="text-lg font-bold">{viewMode === 'underperform' ? 'All Clear!' : 'Tidak ada data'}</h3>
-                                <p className="text-muted-foreground text-sm">
-                                    {viewMode === 'underperform' ? 'Tidak ada yang underperform!' : 'Data belum tersedia'}
+                                <h3 className={cn(
+                                    "text-lg font-bold",
+                                    viewMode === 'underperform' ? "text-emerald-600" :
+                                        viewMode === 'ontrack' ? "text-red-600" : "text-foreground"
+                                )}>
+                                    {viewMode === 'underperform' ? 'Semua On Track! 🎉' :
+                                        viewMode === 'ontrack' ? 'Semua Underperform!' :
+                                            'Tidak ada data'}
+                                </h3>
+                                <p className="text-muted-foreground text-sm mt-1">
+                                    {viewMode === 'underperform' ? 'Tidak ada tim yang underperform saat ini' :
+                                        viewMode === 'ontrack' ? 'Belum ada tim yang mencapai target. Semangat!' :
+                                            'Data belum tersedia untuk periode ini'}
                                 </p>
                             </div>
                         </div>
@@ -390,15 +429,16 @@ export default function ManagerPerformancePage() {
                                 <thead className="bg-muted/50 border-b border-border">
                                     <tr>
                                         <th className="sticky left-0 z-10 bg-muted/50 py-3 pl-4 pr-2 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
-                                            Nama / Unit
+                                            Area
                                         </th>
                                         <th className="px-2 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Pencapaian</th>
                                         {viewMode === 'underperform' ? (
-                                            <th className="px-2 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">GAP</th>
+                                            <th className="px-1.5 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">GAP</th>
                                         ) : (
                                             <>
-                                                <th className="px-1.5 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">CLS</th>
-                                                <th className="px-1.5 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">PND</th>
+                                                <th className="px-1 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">CLS</th>
+                                                <th className="px-1 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">PND</th>
+                                                <th className="px-1 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">REJ</th>
                                             </>
                                         )}
                                         <th className="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-wider text-muted-foreground">%</th>
@@ -443,9 +483,9 @@ export default function ManagerPerformancePage() {
                                                         <div className="text-[9px] text-muted-foreground">dari {m.target || 0}</div>
                                                     </td>
                                                     {viewMode === 'underperform' ? (
-                                                        <td className="px-2 py-3 text-center">
+                                                        <td className="px-1.5 py-3 text-center">
                                                             <div className={cn(
-                                                                "inline-flex items-center px-2 py-0.5 rounded text-[11px] font-black",
+                                                                "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black",
                                                                 gap >= 10 ? "bg-red-500 text-white" : "bg-red-100 text-red-600"
                                                             )}>
                                                                 -{gap}
@@ -453,8 +493,9 @@ export default function ManagerPerformancePage() {
                                                         </td>
                                                     ) : (
                                                         <>
-                                                            <td className="px-1.5 py-3 text-center font-bold text-emerald-500">{m.total_closed}</td>
-                                                            <td className="px-1.5 py-3 text-center font-bold text-amber-500">{m.total_pending}</td>
+                                                            <td className="px-1 py-3 text-center font-bold text-[11px] text-emerald-500">{m.total_closed}</td>
+                                                            <td className="px-1 py-3 text-center font-bold text-[11px] text-amber-500">{m.total_pending}</td>
+                                                            <td className="px-1 py-3 text-center font-bold text-[11px] text-red-500">{m.total_rejected}</td>
                                                         </>
                                                     )}
                                                     <td className="px-4 py-3 text-right">

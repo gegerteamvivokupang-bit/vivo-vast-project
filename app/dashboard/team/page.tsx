@@ -334,23 +334,36 @@ export default function SpvDashboardPage() {
                                     const percent = s.target > 0 ? Math.round((s.total_input / s.target) * 100) : 0;
                                     const kurang = Math.max(0, s.target - s.total_input);
                                     return (
-                                        <div key={s.user_id} className="px-4 py-3">
-                                            <div className="flex justify-between items-center mb-2">
-                                                <span className="font-semibold text-foreground">{s.name}</span>
-                                                <span className="text-lg font-bold text-primary">{s.total_input}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center text-xs text-muted-foreground">
-                                                <div className="flex gap-3">
-                                                    <span>Target: <span className="font-medium text-foreground">{s.target}</span></span>
-                                                    <span className={cn(
+                                        <div key={s.user_id} className="px-4 py-4">
+                                            {/* Row 1: Nama & Pencapaian */}
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <span className="font-bold text-foreground text-base">{s.name}</span>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className={cn(
+                                                        "text-2xl font-bold",
                                                         percent >= 100 ? 'text-emerald-500' : percent >= 50 ? 'text-amber-500' : 'text-red-500'
                                                     )}>
                                                         {percent}%
-                                                    </span>
+                                                    </div>
+                                                    <p className="text-[10px] text-muted-foreground font-semibold uppercase">Pencapaian</p>
                                                 </div>
-                                                <span className="text-red-500">Kurang: <span className="font-medium">{kurang}</span></span>
                                             </div>
-                                            <div className="mt-2 w-full bg-muted rounded-full h-2 overflow-hidden">
+
+                                            {/* Row 2: Stats */}
+                                            <div className="flex justify-between items-center text-xs text-muted-foreground mb-2">
+                                                <div className="flex gap-4">
+                                                    <span>Input: <span className="font-bold text-primary">{s.total_input}</span></span>
+                                                    <span>Target: <span className="font-medium text-foreground">{s.target}</span></span>
+                                                </div>
+                                                {kurang > 0 && (
+                                                    <span className="text-red-500 font-bold">Kurang: {kurang}</span>
+                                                )}
+                                            </div>
+
+                                            {/* Row 3: Progress Bar */}
+                                            <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                                                 <div
                                                     className={cn(
                                                         "h-full rounded-full transition-all",

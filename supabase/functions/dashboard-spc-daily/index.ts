@@ -1,5 +1,6 @@
 // VAST FINANCE - SPC Daily Dashboard Edge Function
 // Query v_agg_daily_store_all untuk toko-toko SPC (is_spc = true)
+// DENGAN DETAIL PER PROMOTOR
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0"
@@ -117,18 +118,105 @@ Deno.serve(async (req) => {
             }
         }
 
-        const result = Array.from(storeMap.values()).map(row => ({
-            store_id: row.store_id,
-            store_name: row.store_name,
-            area: row.area,
-            total_input: row.total_input || 0,
-            total_closed: row.total_closed || 0,
-            total_pending: row.total_pending || 0,
-            total_rejected: row.total_rejected || 0,
-            total_closing_direct: row.total_closing_direct || 0,
-            total_closing_followup: row.total_closing_followup || 0,
-            agg_date: row.agg_date || targetDate
-        }));
+        // Get all store IDs
+        const storeIds = Array.from(storeMap.keys());
+
+        // Query all promotors in SPC stores
+        const { data: promotorData, error: promotorError } = await supabaseClient
+            .from('users')
+            .select('id, name, store_id')
+            .eq('role', 'promotor')
+            .in('store_id', storeIds);
+
+        if (promotorError) {
+            console.error('Promotor query error:', promotorError);
+        }
+
+        const promotors = promotorData || [];
+        const promotorIds = promotors.map(p => p.id);
+
+        // Query targets for all promotors (untuk bulan dari targetDate)
+        const [targetYear, targetMon] = targetDate.split('-').slice(0, 2).map(Number);
+        const { data: targetData, error: targetError } = await supabaseClient
+            .from('targets')
+            .select('user_id, target_value, target_type')
+            .in('user_id', promotorIds)
+            .eq('period_year', targetYear)
+            .eq('period_month', targetMon);
+        // TIDAK filter target_type - ambil semua
+
+        if (targetError) {
+            console.error('Target query error:', targetError);
+        }
+
+        // Map targets - jika user punya multiple target_type, ambil yang terbesar
+        const targetMap = new Map<string, number>();
+        (targetData || []).forEach((t: any) => {
+            const existingTarget = targetMap.get(t.user_id) || 0;
+            const newTarget = t.target_value || 0;
+            if (newTarget > existingTarget) {
+                targetMap.set(t.user_id, newTarget);
+            }
+        });
+
+        // Query aggregate daily untuk semua promotor SPC
+        const { data: aggPromotorData, error: aggPromotorError } = await supabaseClient
+            .from('v_agg_daily_promoter_all')
+            .select('promoter_user_id, total_input, total_closed, total_pending, total_rejected')
+            .in('promoter_user_id', promotorIds)
+            .eq('agg_date', targetDate);
+
+        if (aggPromotorError) {
+            console.error('Promotor aggregate query error:', aggPromotorError);
+        }
+
+        const aggPromotorMap = new Map<string, any>();
+        (aggPromotorData || []).forEach(agg => {
+            aggPromotorMap.set(agg.promoter_user_id, {
+                total_input: agg.total_input || 0,
+                total_closed: agg.total_closed || 0,
+                total_pending: agg.total_pending || 0,
+                total_rejected: agg.total_rejected || 0
+            });
+        });
+
+        // Map promotors to stores and calculate store targets
+        const result = Array.from(storeMap.values()).map(row => {
+            const storePromotors = promotors
+                .filter(p => p.store_id === row.store_id)
+                .map(p => {
+                    const agg = aggPromotorMap.get(p.id) || { total_input: 0, total_closed: 0, total_pending: 0, total_rejected: 0 };
+                    const target = targetMap.get(p.id) || 0;
+                    return {
+                        user_id: p.id,
+                        name: p.name,
+                        target: target,
+                        total_input: agg.total_input,
+                        total_closed: agg.total_closed,
+                        total_pending: agg.total_pending,
+                        total_rejected: agg.total_rejected
+                    };
+                });
+
+            // Target toko = SUM dari target promotor
+            const storeTarget = storePromotors.reduce((sum, p) => sum + (p.target || 0), 0);
+
+            return {
+                store_id: row.store_id,
+                store_name: row.store_name,
+                store_code: row.store_code || '',
+                area: row.area,
+                target: storeTarget,
+                total_input: row.total_input || 0,
+                total_closed: row.total_closed || 0,
+                total_pending: row.total_pending || 0,
+                total_rejected: row.total_rejected || 0,
+                total_closing_direct: row.total_closing_direct || 0,
+                total_closing_followup: row.total_closing_followup || 0,
+                agg_date: row.agg_date || targetDate,
+                promotors: storePromotors
+            };
+        });
 
         // Sort by total_input descending
         result.sort((a, b) => b.total_input - a.total_input);
@@ -141,7 +229,7 @@ Deno.serve(async (req) => {
             rejected: acc.rejected + s.total_rejected
         }), { input: 0, closed: 0, pending: 0, rejected: 0 });
 
-        console.log('SPC Daily - returning', result.length, 'stores');
+        console.log('SPC Daily - returning', result.length, 'stores with promotor details');
 
         return new Response(
             JSON.stringify({

@@ -47,7 +47,19 @@ interface StoreData {
     daily_closed?: number;
     daily_pending?: number;
     daily_rejected?: number;
-    promotors?: { name: string; total_input: number; daily_input?: number }[];
+    promotors?: {
+        user_id?: string;
+        name: string;
+        target?: number;
+        total_input: number;
+        total_closed?: number;
+        total_pending?: number;
+        total_rejected?: number;
+        daily_input?: number;
+        daily_closed?: number;
+        daily_pending?: number;
+        daily_rejected?: number;
+    }[];
 }
 
 // Interface untuk daily data
@@ -268,15 +280,16 @@ export default function ExportPage() {
                 const spcData = spcMonthlyResponse.data;
                 const spcDailyData = spcDailyResponse.data;
 
-                // Build SPC daily map untuk quick lookup
-                const spcDailyMap = new Map<string, { total_input: number; total_closed: number; total_pending: number; total_rejected: number }>();
+                // Build SPC daily map untuk quick lookup (include promotors)
+                const spcDailyMap = new Map<string, { total_input: number; total_closed: number; total_pending: number; total_rejected: number; promotors?: any[] }>();
                 if (spcDailyData?.success && spcDailyData?.stores) {
                     spcDailyData.stores.forEach((store: any) => {
                         spcDailyMap.set(store.store_id, {
                             total_input: store.total_input || 0,
                             total_closed: store.total_closed || 0,
                             total_pending: store.total_pending || 0,
-                            total_rejected: store.total_rejected || 0
+                            total_rejected: store.total_rejected || 0,
+                            promotors: store.promotors || []
                         });
                     });
                 }
@@ -284,63 +297,30 @@ export default function ExportPage() {
                 if (!spcMonthlyResponse.error && spcData?.success) {
                     const stores = spcData.stores || [];
 
-                    console.log('📦 Total SPC Stores:', stores.length);
-
-                    // OPTIMIZED: Query semua promotor SPC sekaligus
-                    const spcStoreIds = stores.map((s: StoreData) => s.store_id);
-
-                    // 1. Query semua promotor yang assigned ke SPC stores
-                    const { data: allSpcPromotors } = await supabase
-                        .from('users')
-                        .select('id, name, store_id')
-                        .eq('role', 'promotor')
-                        .in('store_id', spcStoreIds);
-
-                    // 2. Query aggregate bulanan untuk semua promotor tsb
-                    const spcPromotorIds = (allSpcPromotors || []).map(p => p.id);
-                    const { data: allAggData } = spcPromotorIds.length > 0 ? await supabase
-                        .from('v_agg_monthly_promoter_all')
-                        .select('promoter_user_id, total_input')
-                        .in('promoter_user_id', spcPromotorIds)
-                        .eq('agg_month', `${monthStr}-01`) : { data: [] };
-
-                    // 2b. Query aggregate harian untuk semua promotor SPC
-                    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Makassar' }).format(new Date());
-                    const { data: allDailyAggData } = spcPromotorIds.length > 0 ? await supabase
-                        .from('v_agg_daily_promoter_all')
-                        .select('promoter_user_id, total_input')
-                        .in('promoter_user_id', spcPromotorIds)
-                        .eq('agg_date', todayStr) : { data: [] };
-
-                    const dailyPromotorAggMap = new Map((allDailyAggData || []).map(a => [a.promoter_user_id, a.total_input || 0]));
-
-                    // 3. Map ke setiap store dengan merge daily data
-                    const storesWithPromotors = stores.map((store: StoreData) => {
+                    // Langsung pakai promotors dari Edge Function yang sudah lengkap
+                    const storesWithDaily = stores.map((store: any) => {
                         const dailyStore = spcDailyMap.get(store.store_id);
-                        const storePromotors = (allSpcPromotors || [])
-                            .filter(p => p.store_id === store.store_id)
-                            .map(p => {
-                                const agg = (allAggData || []).find(a => a.promoter_user_id === p.id);
-                                const dailyInput = dailyPromotorAggMap.get(p.id) || 0;
-                                return {
-                                    name: p.name,
-                                    total_input: agg?.total_input || 0,
-                                    daily_input: dailyInput
-                                };
-                            });
+
+                        // Merge daily data ke promotors dari Edge Function
+                        const promotorsWithDaily = (store.promotors || []).map((p: any) => ({
+                            ...p,
+                            daily_input: dailyStore?.promotors?.find((dp: any) => dp.user_id === p.user_id)?.total_input || 0,
+                            daily_closed: dailyStore?.promotors?.find((dp: any) => dp.user_id === p.user_id)?.total_closed || 0,
+                            daily_pending: dailyStore?.promotors?.find((dp: any) => dp.user_id === p.user_id)?.total_pending || 0,
+                            daily_rejected: dailyStore?.promotors?.find((dp: any) => dp.user_id === p.user_id)?.total_rejected || 0
+                        }));
+
                         return {
                             ...store,
                             daily_input: dailyStore?.total_input || 0,
                             daily_closed: dailyStore?.total_closed || 0,
                             daily_pending: dailyStore?.total_pending || 0,
                             daily_rejected: dailyStore?.total_rejected || 0,
-                            promotors: storePromotors
+                            promotors: promotorsWithDaily
                         };
                     });
 
-                    console.log(`📦 SPC Loaded: ${stores.length} stores, ${allSpcPromotors?.length || 0} promotors`);
-
-                    setSpcStores(storesWithPromotors);
+                    setSpcStores(storesWithDaily);
                     setSpcTotals(spcData.totals || { input: 0, closed: 0, pending: 0, rejected: 0, target: 0 });
                 }
             }
@@ -450,36 +430,57 @@ export default function ExportPage() {
                     });
                     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(spcExportData), 'SPC_PERFORMANCE');
 
-                    // Sheet 2: SPC Detail Promotor
+                    // Sheet 2: SPC Detail Promotor (dengan target)
                     const spcPromotorDetail: any[] = [];
                     spcStores.forEach(store => {
                         if (store.promotors && store.promotors.length > 0) {
                             store.promotors.forEach(promotor => {
+                                const promotorPct = promotor.target && promotor.target > 0
+                                    ? Math.round((promotor.total_input / promotor.target) * 100)
+                                    : 0;
                                 spcPromotorDetail.push({
                                     TOKO: store.store_name,
                                     PROMOTOR: promotor.name,
-                                    'INPUT (H/T)': `${promotor.daily_input || 0}/${promotor.total_input}`
+                                    TARGET: promotor.target || 0,
+                                    'INPUT (H/T)': `${promotor.daily_input || 0}/${promotor.total_input}`,
+                                    'CAPAIAN_%': promotorPct,
+                                    'CLOSING (H/T)': `${promotor.daily_closed || 0}/${promotor.total_closed}`,
+                                    'PENDING (H/T)': `${promotor.daily_pending || 0}/${promotor.total_pending}`,
+                                    'REJECT (H/T)': `${promotor.daily_rejected || 0}/${promotor.total_rejected}`
                                 });
                             });
                         } else {
                             spcPromotorDetail.push({
                                 TOKO: store.store_name,
                                 PROMOTOR: '(Tidak ada promotor)',
-                                'INPUT (H/T)': '0/0'
+                                TARGET: 0,
+                                'INPUT (H/T)': '0/0',
+                                'CAPAIAN_%': 0,
+                                'CLOSING (H/T)': '0/0',
+                                'PENDING (H/T)': '0/0',
+                                'REJECT (H/T)': '0/0'
                             });
                         }
                     });
                     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(spcPromotorDetail), 'SPC_PROMOTOR_DETAIL');
 
-                    // Sheet 3: SPC Summary
+                    // Sheet 3: SPC Summary dengan Header Standar
+                    const today = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+                    const managerName = user?.role === 'manager' ? user.name : (user?.name || 'N/A');
+
                     const spcSummary = [
-                        { Info: 'PERIODE', Nilai: periodLabel },
-                        { Info: 'TIME GONE', Nilai: `${timeGonePercent}%` },
-                        { Info: 'TOTAL TOKO SPC', Nilai: spcStores.length },
-                        { Info: 'TOTAL TARGET', Nilai: spcTotals.target },
-                        { Info: 'TOTAL INPUT', Nilai: spcTotals.input },
-                        { Info: 'TOTAL CLOSING', Nilai: spcTotals.closed },
-                        { Info: 'CAPAIAN', Nilai: spcTotals.target > 0 ? `${Math.round((spcTotals.input / spcTotals.target) * 100)}%` : '-' },
+                        { Label: 'HEADER', Value: 'SPC GRUP' },
+                        { Label: 'AREA', Value: 'TIMOR-SUMBA' },
+                        { Label: 'MANAGER AREA', Value: managerName },
+                        { Label: 'TANGGAL', Value: today },
+                        { Label: '', Value: '' },
+                        { Label: 'PERIODE', Value: periodLabel },
+                        { Label: 'TIME GONE', Value: `${timeGonePercent}%` },
+                        { Label: 'TOTAL TOKO SPC', Value: spcStores.length },
+                        { Label: 'TOTAL TARGET', Value: spcTotals.target },
+                        { Label: 'TOTAL INPUT', Value: spcTotals.input },
+                        { Label: 'TOTAL CLOSING', Value: spcTotals.closed },
+                        { Label: 'CAPAIAN', Value: spcTotals.target > 0 ? `${Math.round((spcTotals.input / spcTotals.target) * 100)}%` : '-' },
                     ];
                     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(spcSummary), 'SPC_SUMMARY');
                 }
@@ -487,10 +488,11 @@ export default function ExportPage() {
                 XLSX.writeFile(wb, `Laporan_${userName}_${dateStr}.xlsx`);
             }
 
-            // PNG EXPORT - Single combined report
+            // PNG EXPORT - Download multiple images
             if (exportFormat === 'png') {
-                if (reportRef.current) {
-                    const canvas = await html2canvas(reportRef.current, {
+                const downloadImage = async (ref: React.RefObject<HTMLDivElement>, filename: string) => {
+                    if (!ref.current) return;
+                    const canvas = await html2canvas(ref.current, {
                         backgroundColor: '#ffffff',
                         scale: 2,
                         logging: false,
@@ -499,9 +501,21 @@ export default function ExportPage() {
                         removeContainer: true
                     });
                     const link = document.createElement('a');
-                    link.download = `Laporan_${userName}_${dateStr}.png`;
+                    link.download = filename;
                     link.href = canvas.toDataURL('image/png');
                     link.click();
+                };
+
+                // Download Tim Performance (Sator + Promotor)
+                if (includeTeamPerformance && reportRef.current) {
+                    await downloadImage(reportRef, `Laporan_Tim_${userName}_${dateStr}.png`);
+                }
+
+                // Download SPC if selected
+                if (includeSpcData && hasSpcAccess && spcStores.length > 0 && spcTableRef.current) {
+                    // Small delay between downloads
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    await downloadImage(spcTableRef, `Laporan_SPC_${userName}_${dateStr}.png`);
                 }
             }
 
@@ -717,34 +731,92 @@ export default function ExportPage() {
                                         </div>
                                     )}
 
-                                    {/* SPC Preview */}
+                                    {/* SPC Preview - dengan Header Standar + Detail Promotor */}
                                     {includeSpcData && hasSpcAccess && spcStores.length > 0 && (
                                         <div className="bg-purple-50/30">
-                                            <div className="bg-purple-500/10 px-4 py-2 flex justify-between items-center border-b border-purple-200/50">
-                                                <span className="text-[10px] font-black text-purple-700 uppercase tracking-widest flex items-center gap-1.5"><div className="w-1 h-3 bg-purple-500 rounded-full" /> SPC Group</span>
-                                                <span className="text-[9px] font-bold text-purple-600 uppercase">H/T/TGT</span>
+                                            {/* Header SPC */}
+                                            <div className="bg-purple-700 px-4 py-3 text-white">
+                                                <div className="text-[11px] font-black uppercase tracking-widest mb-1">SPC GRUP</div>
+                                                <div className="text-[9px] space-y-0.5">
+                                                    <div>AREA: TIMOR-SUMBA</div>
+                                                    <div>SPV: {user?.name || 'N/A'}</div>
+                                                    <div>TANGGAL: {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
+                                                </div>
+                                            </div>
+
+                                            {/* Tabel Toko */}
+                                            <div className="bg-purple-500/10 px-4 py-2 border-b border-purple-200/50">
+                                                <span className="text-[10px] font-black text-purple-700 uppercase tracking-widest">Performance Toko ({spcStores.length})</span>
                                             </div>
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-[10px]">
                                                     <thead className="bg-purple-100/50">
                                                         <tr>
                                                             <th className="px-3 py-1.5 text-left font-bold text-purple-700">TOKO</th>
+                                                            <th className="px-2 py-1.5 text-center font-bold text-purple-700">TGT</th>
                                                             <th className="px-2 py-1.5 text-center font-bold text-purple-700">INPUT</th>
-                                                            <th className="px-2 py-1.5 text-center font-bold text-purple-700">CLO</th>
-                                                            <th className="px-2 py-1.5 text-center font-bold text-purple-700">PND</th>
+                                                            <th className="px-2 py-1.5 text-center font-bold text-purple-700">%</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-purple-100">
-                                                        {spcStores.slice(0, 3).map((s, i) => (
-                                                            <tr key={i} className="hover:bg-purple-500/5">
-                                                                <td className="px-3 py-2 font-bold text-purple-900">{s.store_name}</td>
-                                                                <td className="px-2 py-2 text-center font-mono text-purple-600 font-bold">{s.daily_input || 0}/{s.total_input}/{s.target}</td>
-                                                                <td className="px-2 py-2 text-center font-mono text-emerald-600">{s.daily_closed || 0}/{s.total_closed}</td>
-                                                                <td className="px-2 py-2 text-center font-mono text-amber-600">{s.daily_pending || 0}/{s.total_pending}</td>
-                                                            </tr>
-                                                        ))}
+                                                        {spcStores.slice(0, 3).map((s, i) => {
+                                                            const pct = s.target > 0 ? Math.round((s.total_input / s.target) * 100) : 0;
+                                                            return (
+                                                                <tr key={i} className="hover:bg-purple-500/5">
+                                                                    <td className="px-3 py-2 font-bold text-purple-900">{s.store_name}</td>
+                                                                    <td className="px-2 py-2 text-center font-mono text-purple-600">{s.target}</td>
+                                                                    <td className="px-2 py-2 text-center font-mono text-purple-600 font-bold">{s.daily_input || 0}/{s.total_input}</td>
+                                                                    <td className={cn("px-2 py-2 text-center font-bold", pct >= timeGonePercent ? "text-emerald-600" : "text-red-500")}>{pct}%</td>
+                                                                </tr>
+                                                            );
+                                                        })}
                                                     </tbody>
                                                 </table>
+                                            </div>
+
+                                            {/* Detail Promotor */}
+                                            <div className="bg-purple-400/10 px-4 py-2 border-b border-purple-200/50 border-t">
+                                                <span className="text-[10px] font-black text-purple-700 uppercase tracking-widest">Detail Promotor (Sample)</span>
+                                            </div>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-[9px]">
+                                                    <thead className="bg-purple-200/50">
+                                                        <tr>
+                                                            <th className="px-2 py-1 text-left font-bold text-purple-700">TOKO</th>
+                                                            <th className="px-2 py-1 text-left font-bold text-purple-700">PROMOTOR</th>
+                                                            <th className="px-2 py-1 text-center font-bold text-purple-700">TGT</th>
+                                                            <th className="px-2 py-1 text-center font-bold text-purple-700">INPUT</th>
+                                                            <th className="px-2 py-1 text-center font-bold text-purple-700">%</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-purple-100">
+                                                        {spcStores.slice(0, 2).map((store, storeIdx) => {
+                                                            if (!store.promotors || store.promotors.length === 0) {
+                                                                return (
+                                                                    <tr key={`st-${storeIdx}`} className="bg-yellow-50">
+                                                                        <td className="px-2 py-1.5 text-purple-600">{store.store_name}</td>
+                                                                        <td colSpan={4} className="px-2 py-1.5 text-center italic text-gray-500">(Tidak ada promotor)</td>
+                                                                    </tr>
+                                                                );
+                                                            }
+                                                            return store.promotors.slice(0, 2).map((promotor, promIdx) => {
+                                                                const promPct = promotor.target && promotor.target > 0 ? Math.round((promotor.total_input / promotor.target) * 100) : 0;
+                                                                return (
+                                                                    <tr key={`${storeIdx}-${promIdx}`} className="hover:bg-purple-500/5">
+                                                                        <td className="px-2 py-1.5 text-purple-600 text-[8px]">{promIdx === 0 ? store.store_name : ''}</td>
+                                                                        <td className="px-2 py-1.5 font-bold text-purple-900">{promotor.name}</td>
+                                                                        <td className="px-2 py-1.5 text-center font-mono text-purple-600">{promotor.target || 0}</td>
+                                                                        <td className="px-2 py-1.5 text-center font-mono text-purple-700 font-bold">{promotor.daily_input || 0}/{promotor.total_input}</td>
+                                                                        <td className={cn("px-2 py-1.5 text-center font-bold", promPct >= timeGonePercent ? "text-emerald-600" : "text-red-500")}>{promPct}%</td>
+                                                                    </tr>
+                                                                );
+                                                            });
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <div className="px-4 py-2 bg-purple-50 border-t border-purple-200/50">
+                                                <p className="text-[8px] text-purple-600 italic">Preview terbatas. Download untuk data lengkap.</p>
                                             </div>
                                         </div>
                                     )}
@@ -931,6 +1003,248 @@ export default function ExportPage() {
                 </div>
 
             </div>
+
+            {/* PNG TEMPLATE - Hidden, for export only */}
+            <div style={{ position: 'absolute', left: '-9999px', pointerEvents: 'none' }}>
+                <div ref={reportRef} style={{ width: '800px', padding: '24px', backgroundColor: '#ffffff', fontFamily: 'Arial, sans-serif' }}>
+
+                    {/* Header - Kondisional: SPC GRUP atau SPV TEAM */}
+                    <div style={{ borderBottom: '3px solid #1e293b', paddingBottom: '16px', marginBottom: '20px' }}>
+                        <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>
+                            {includeSpcData && !includeTeamPerformance && !includeTeamUnderperform ? 'SPC GRUP' : 'SPV TEAM PERFORMANCE'}
+                        </h1>
+                        {includeSpcData && !includeTeamPerformance && !includeTeamUnderperform && (
+                            <div style={{ fontSize: '13px', color: '#7c3aed', margin: '8px 0 0 0', fontWeight: 'bold' }}>
+                                <div>AREA: TIMOR-SUMBA</div>
+                                <div>SPV: {user?.name || 'N/A'}</div>
+                            </div>
+                        )}
+                        <p style={{ fontSize: '14px', color: '#64748b', margin: '4px 0 0 0' }}>
+                            {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} | Periode: {periodLabel}
+                        </p>
+                        <p style={{ fontSize: '11px', color: '#94a3b8', margin: '4px 0 0 0' }}>
+                            Format: Hari Ini / Total Bulan{includeSpcData ? '' : ' / Target'}
+                        </p>
+                    </div>
+
+                    {/* Team Performance Tables */}
+                    {includeTeamPerformance && sators.length > 0 && (
+                        <div style={{ marginBottom: '24px' }}>
+                            <h2 style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e293b', marginBottom: '8px', borderLeft: '4px solid #3b82f6', paddingLeft: '8px' }}>SATOR PERFORMANCE</h2>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                                <thead>
+                                    <tr style={{ backgroundColor: '#1e293b', color: '#ffffff' }}>
+                                        <th style={{ padding: '6px', textAlign: 'left', fontWeight: 'bold' }}>SATOR</th>
+                                        <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>INPUT (H/T/TGT)</th>
+                                        <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>CLO</th>
+                                        <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>%</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {sators.slice(0, 15).map((s, i) => {
+                                        const pct = s.target > 0 ? Math.round((s.total_input / s.target) * 100) : 0;
+                                        return (
+                                            <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                                                <td style={{ padding: '6px', fontWeight: 'bold', color: '#1e293b' }}>{s.name}</td>
+                                                <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#3b82f6', fontWeight: 'bold' }}>{s.daily_input || 0}/{s.total_input}/{s.target}</td>
+                                                <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#10b981' }}>{s.daily_closed || 0}/{s.total_closed}</td>
+                                                <td style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold', color: pct >= timeGonePercent ? '#10b981' : '#ef4444' }}>{pct}%</td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                    {/* SPC Data */}
+                    {includeSpcData && spcStores.length > 0 && (
+                        <div style={{ marginBottom: '24px', pageBreakInside: 'avoid' }}>
+                            {/* Tabel Toko */}
+                            <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: '#7c3aed', marginBottom: '8px', borderLeft: '4px solid #7c3aed', paddingLeft: '8px' }}>
+                                PERFORMANCE TOKO ({spcStores.length} Toko)
+                            </h3>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', marginBottom: '20px' }}>
+                                <thead>
+                                    <tr style={{ backgroundColor: '#7c3aed', color: '#ffffff' }}>
+                                        <th style={{ padding: '6px', textAlign: 'left', fontWeight: 'bold' }}>TOKO</th>
+                                        <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>TARGET</th>
+                                        <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>INPUT (H/T)</th>
+                                        <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>%</th>
+                                        <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>CLO</th>
+                                        <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>PND</th>
+                                        <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>REJ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {spcStores.map((s, i) => {
+                                        const pct = s.target > 0 ? Math.round((s.total_input / s.target) * 100) : 0;
+                                        return (
+                                            <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#faf5ff', borderBottom: '1px solid #e9d5ff' }}>
+                                                <td style={{ padding: '6px', fontWeight: 'bold', color: '#1e293b' }}>{s.store_name}</td>
+                                                <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#64748b' }}>{s.target}</td>
+                                                <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#7c3aed', fontWeight: 'bold' }}>{s.daily_input || 0}/{s.total_input}</td>
+                                                <td style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold', color: pct >= timeGonePercent ? '#10b981' : '#ef4444' }}>{pct}%</td>
+                                                <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#10b981' }}>{s.daily_closed || 0}/{s.total_closed}</td>
+                                                <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#f59e0b' }}>{s.daily_pending || 0}/{s.total_pending}</td>
+                                                <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#ef4444' }}>{s.daily_rejected || 0}/{s.total_rejected}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+
+                            {/* Detail Per Promotor */}
+                            <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: '#7c3aed', marginBottom: '8px', borderLeft: '4px solid #7c3aed', paddingLeft: '8px' }}>
+                                DETAIL PER PROMOTOR
+                            </h3>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
+                                <thead>
+                                    <tr style={{ backgroundColor: '#a78bfa', color: '#ffffff' }}>
+                                        <th style={{ padding: '5px', textAlign: 'left', fontWeight: 'bold' }}>TOKO</th>
+                                        <th style={{ padding: '5px', textAlign: 'left', fontWeight: 'bold' }}>PROMOTOR</th>
+                                        <th style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold' }}>TARGET</th>
+                                        <th style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold' }}>INPUT (H/T)</th>
+                                        <th style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold' }}>%</th>
+                                        <th style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold' }}>CLO</th>
+                                        <th style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold' }}>PND</th>
+                                        <th style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold' }}>REJ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {spcStores.map((store, storeIdx) => {
+                                        if (!store.promotors || store.promotors.length === 0) {
+                                            return (
+                                                <tr key={`store-${storeIdx}`} style={{ backgroundColor: storeIdx % 2 === 0 ? '#fefce8' : '#fef9c3', borderBottom: '1px solid #fde047' }}>
+                                                    <td style={{ padding: '5px', color: '#78716c', fontSize: '9px' }}>{store.store_name}</td>
+                                                    <td colSpan={7} style={{ padding: '5px', textAlign: 'center', fontStyle: 'italic', color: '#78716c' }}>(Tidak ada promotor)</td>
+                                                </tr>
+                                            );
+                                        }
+                                        return store.promotors.map((promotor, promIdx) => {
+                                            const promotorPct = promotor.target && promotor.target > 0 ? Math.round((promotor.total_input / promotor.target) * 100) : 0;
+                                            return (
+                                                <tr key={`${storeIdx}-${promIdx}`} style={{ backgroundColor: storeIdx % 2 === 0 ? '#ffffff' : '#faf5ff', borderBottom: '1px solid #e9d5ff' }}>
+                                                    <td style={{ padding: '5px', color: '#64748b', fontSize: '9px' }}>{promIdx === 0 ? store.store_name : ''}</td>
+                                                    <td style={{ padding: '5px', fontWeight: 'bold', color: '#1e293b' }}>{promotor.name}</td>
+                                                    <td style={{ padding: '5px', textAlign: 'center', fontFamily: 'monospace', color: '#64748b' }}>{promotor.target || 0}</td>
+                                                    <td style={{ padding: '5px', textAlign: 'center', fontFamily: 'monospace', color: '#7c3aed', fontWeight: 'bold' }}>{promotor.daily_input || 0}/{promotor.total_input}</td>
+                                                    <td style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold', color: promotorPct >= timeGonePercent ? '#10b981' : '#ef4444' }}>{promotorPct}%</td>
+                                                    <td style={{ padding: '5px', textAlign: 'center', fontFamily: 'monospace', color: '#10b981' }}>{promotor.daily_closed || 0}/{promotor.total_closed || 0}</td>
+                                                    <td style={{ padding: '5px', textAlign: 'center', fontFamily: 'monospace', color: '#f59e0b' }}>{promotor.daily_pending || 0}/{promotor.total_pending || 0}</td>
+                                                    <td style={{ padding: '5px', textAlign: 'center', fontFamily: 'monospace', color: '#ef4444' }}>{promotor.daily_rejected || 0}/{promotor.total_rejected || 0}</td>
+                                                </tr>
+                                            );
+                                        });
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                </div>
+            </div>
+
+            {/* PNG TEMPLATE - SPC (Hidden, separate for split export) */}
+            {hasSpcAccess && spcStores.length > 0 && (
+                <div style={{ position: 'absolute', left: '-9999px', pointerEvents: 'none' }}>
+                    <div ref={spcTableRef} style={{ width: '800px', padding: '24px', backgroundColor: '#ffffff', fontFamily: 'Arial, sans-serif' }}>
+                        {/* Header SPC */}
+                        <div style={{ borderBottom: '3px solid #7c3aed', paddingBottom: '16px', marginBottom: '20px' }}>
+                            <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: '#7c3aed', margin: 0 }}>SPC GRUP - PERFORMANCE TOKO</h1>
+                            <p style={{ fontSize: '14px', color: '#64748b', margin: '4px 0 0 0' }}>
+                                {user?.name} | {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} | Periode: {periodLabel}
+                            </p>
+                            <p style={{ fontSize: '11px', color: '#94a3b8', margin: '4px 0 0 0' }}>Format: Hari Ini / Total Bulan / Target | Time Gone: {timeGonePercent}%</p>
+                        </div>
+
+                        {/* Tabel Toko */}
+                        <div style={{ marginBottom: '24px' }}>
+                            <h2 style={{ fontSize: '16px', fontWeight: 'bold', color: '#7c3aed', marginBottom: '8px', borderLeft: '4px solid #7c3aed', paddingLeft: '8px' }}>PERFORMANCE TOKO ({spcStores.length} Toko)</h2>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                                <thead>
+                                    <tr style={{ backgroundColor: '#7c3aed', color: '#ffffff' }}>
+                                        <th style={{ padding: '6px', textAlign: 'left', fontWeight: 'bold' }}>TOKO</th>
+                                        <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>TGT</th>
+                                        <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>INPUT (H/T)</th>
+                                        <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>%</th>
+                                        <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>CLO (H/T)</th>
+                                        <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>PND (H/T)</th>
+                                        <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>REJ (H/T)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {spcStores.map((s, i) => {
+                                        const pct = s.target > 0 ? Math.round((s.total_input / s.target) * 100) : 0;
+                                        return (
+                                            <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#faf5ff', borderBottom: '1px solid #e9d5ff' }}>
+                                                <td style={{ padding: '6px', fontWeight: 'bold', color: '#1e293b' }}>{s.store_name}</td>
+                                                <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#64748b' }}>{s.target}</td>
+                                                <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#7c3aed', fontWeight: 'bold' }}>{s.daily_input || 0}/{s.total_input}</td>
+                                                <td style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold', color: pct >= timeGonePercent ? '#10b981' : '#ef4444' }}>{pct}%</td>
+                                                <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#10b981' }}>{s.daily_closed || 0}/{s.total_closed}</td>
+                                                <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#f59e0b' }}>{s.daily_pending || 0}/{s.total_pending}</td>
+                                                <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#ef4444' }}>{s.daily_rejected || 0}/{s.total_rejected}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Detail Per Promotor */}
+                        <div style={{ marginBottom: '24px' }}>
+                            <h2 style={{ fontSize: '16px', fontWeight: 'bold', color: '#7c3aed', marginBottom: '8px', borderLeft: '4px solid #7c3aed', paddingLeft: '8px' }}>DETAIL PER PROMOTOR</h2>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
+                                <thead>
+                                    <tr style={{ backgroundColor: '#a78bfa', color: '#ffffff' }}>
+                                        <th style={{ padding: '5px', textAlign: 'left', fontWeight: 'bold' }}>TOKO</th>
+                                        <th style={{ padding: '5px', textAlign: 'left', fontWeight: 'bold' }}>PROMOTOR</th>
+                                        <th style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold' }}>TGT</th>
+                                        <th style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold' }}>INPUT (H/T)</th>
+                                        <th style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold' }}>%</th>
+                                        <th style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold' }}>CLO (H/T)</th>
+                                        <th style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold' }}>PND (H/T)</th>
+                                        <th style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold' }}>REJ (H/T)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {spcStores.map((store, storeIdx) => {
+                                        if (!store.promotors || store.promotors.length === 0) {
+                                            return (
+                                                <tr key={`store-${storeIdx}`} style={{ backgroundColor: storeIdx % 2 === 0 ? '#fefce8' : '#fef9c3', borderBottom: '1px solid #fde047' }}>
+                                                    <td style={{ padding: '5px', color: '#78716c', fontSize: '9px' }}>{store.store_name}</td>
+                                                    <td colSpan={7} style={{ padding: '5px', textAlign: 'center', fontStyle: 'italic', color: '#78716c' }}>(Tidak ada promotor)</td>
+                                                </tr>
+                                            );
+                                        }
+                                        return store.promotors.map((promotor, promIdx) => {
+                                            const promotorPct = promotor.target && promotor.target > 0 ? Math.round((promotor.total_input / promotor.target) * 100) : 0;
+                                            return (
+                                                <tr key={`${storeIdx}-${promIdx}`} style={{ backgroundColor: storeIdx % 2 === 0 ? '#ffffff' : '#faf5ff', borderBottom: '1px solid #e9d5ff' }}>
+                                                    <td style={{ padding: '5px', color: '#64748b', fontSize: '9px' }}>{promIdx === 0 ? store.store_name : ''}</td>
+                                                    <td style={{ padding: '5px', fontWeight: 'bold', color: '#1e293b' }}>{promotor.name}</td>
+                                                    <td style={{ padding: '5px', textAlign: 'center', fontFamily: 'monospace', color: '#64748b' }}>{promotor.target || 0}</td>
+                                                    <td style={{ padding: '5px', textAlign: 'center', fontFamily: 'monospace', color: '#7c3aed', fontWeight: 'bold' }}>{promotor.daily_input || 0}/{promotor.total_input}</td>
+                                                    <td style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold', color: promotorPct >= timeGonePercent ? '#10b981' : '#ef4444' }}>{promotorPct}%</td>
+                                                    <td style={{ padding: '5px', textAlign: 'center', fontFamily: 'monospace', color: '#10b981' }}>{promotor.daily_closed || 0}/{promotor.total_closed || 0}</td>
+                                                    <td style={{ padding: '5px', textAlign: 'center', fontFamily: 'monospace', color: '#f59e0b' }}>{promotor.daily_pending || 0}/{promotor.total_pending || 0}</td>
+                                                    <td style={{ padding: '5px', textAlign: 'center', fontFamily: 'monospace', color: '#ef4444' }}>{promotor.daily_rejected || 0}/{promotor.total_rejected || 0}</td>
+                                                </tr>
+                                            );
+                                        });
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Footer */}
+                        <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '12px', marginTop: '20px' }}>
+                            <p style={{ fontSize: '10px', color: '#94a3b8', margin: 0 }}>Generated by SMARA System | Time Gone: {timeGonePercent}%</p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </DashboardLayout>
     );
 }
