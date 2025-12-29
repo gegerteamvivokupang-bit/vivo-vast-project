@@ -452,7 +452,7 @@ export default function ManagerExportPage() {
             }
 
             if (exportFormat === 'png') {
-                const downloadImage = async (ref: React.RefObject<HTMLDivElement>, filename: string) => {
+                const downloadImage = async (ref: React.RefObject<HTMLDivElement | null>, filename: string) => {
                     if (!ref.current) return;
                     const canvas = await html2canvas(ref.current, {
                         backgroundColor: '#ffffff',
