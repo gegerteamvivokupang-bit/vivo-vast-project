@@ -7,44 +7,44 @@ import ManagerHeader from '@/components/ManagerHeader';
 import { Loading } from '@/components/ui/loading';
 import { Alert } from '@/components/ui/alert';
 import { createClient } from '@/lib/supabase/client';
-import { formatCurrency } from '@/lib/utils/format';
-import { cn } from '@/lib/utils';
 import { ChevronRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { cn } from '@/lib/utils'; // Restore cn import
 
-interface Promotor {
-    user_id: string;
+// Shared Types
+import { AggDailyPromoter, FinanceData } from '@/types/api.types';
+
+// Utilities
+import { parseSupabaseError, logError } from '@/lib/errors';
+import { formatDateWITA, getCurrentDateWITA } from '@/lib/date-utils';
+import { formatCurrency } from '@/lib/dashboard-logic';
+
+interface LocalPromotor extends AggDailyPromoter {
+    user_id: string; // Compatibility with legacy API structure
     name: string;
-    total_input: number;
-    total_closed: number;
-    total_pending: number;
-    total_rejected: number;
     is_empty: boolean;
     has_reject: boolean;
 }
 
-interface Sator {
+interface LocalSator {
     user_id: string;
     name: string;
-    total_input: number;
-    total_closed: number;
-    total_pending: number;
-    total_rejected: number;
-    promotors: Promotor[];
+    total_input: number; // Aggregated manually or by DB
+    promotors: LocalPromotor[];
 }
 
-interface Area {
-    user_id: string;
+interface LocalArea {
+    user_id: string; // Area ID (usually SPV ID or Area ID)
     area_name: string;
     spv_name: string;
     total_input: number;
     total_closed: number;
     total_pending: number;
     total_rejected: number;
-    sators: Sator[];
+    sators: LocalSator[];
 }
 
-interface DailyData {
+interface DailyDataDetail {
     date: string;
     date_formatted: string;
     totals: {
@@ -59,7 +59,7 @@ interface DailyData {
         empty: number;
         with_reject: number;
     };
-    areas: Area[];
+    areas: LocalArea[];
 }
 
 interface Submission {
@@ -79,20 +79,20 @@ interface Submission {
 
 export default function ManagerDailyPage() {
     const { user } = useAuth();
-    const [data, setData] = useState<DailyData | null>(null);
+    const [data, setData] = useState<DailyDataDetail | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedArea, setSelectedArea] = useState<string>('all');
 
     // Modal state for promotor list
     const [showModal, setShowModal] = useState(false);
-    const [modalPromotor, setModalPromotor] = useState<Promotor | null>(null);
-    const [modalSubmissions, setModalSubmissions] = useState<Submission[]>([]);
+    const [modalPromotor, setModalPromotor] = useState<LocalPromotor | null>(null);
+    const [modalSubmissions, setModalSubmissions] = useState<FinanceData[]>([]);
     const [modalLoading, setModalLoading] = useState(false);
 
     // Modal state for submission detail
     const [showDetailModal, setShowDetailModal] = useState(false);
-    const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
+    const [selectedSubmission, setSelectedSubmission] = useState<FinanceData | null>(null);
 
     useEffect(() => {
         if (user) fetchData();
@@ -107,14 +107,15 @@ export default function ManagerDailyPage() {
             if (fnError) throw fnError;
             setData(result);
         } catch (err) {
-            console.error(err);
-            setError('Gagal memuat data');
+            const apiError = parseSupabaseError(err);
+            logError(apiError, { userId: user?.id, page: 'manager-dashboard-daily', action: 'fetchData' });
+            setError(apiError.message);
         } finally {
             setLoading(false);
         }
     };
 
-    const openPromotorDetail = async (promotor: Promotor) => {
+    const openPromotorDetail = async (promotor: LocalPromotor) => {
         setModalPromotor(promotor);
         setShowModal(true);
         setModalLoading(true);
@@ -124,18 +125,14 @@ export default function ManagerDailyPage() {
             const supabase = createClient();
 
             // Get today in WITA
-            const today = new Intl.DateTimeFormat('en-CA', {
-                timeZone: 'Asia/Makassar',
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit'
-            }).format(new Date());
+            // Get today in WITA using updated utility
+            const today = formatDateWITA(getCurrentDateWITA());
 
             // Fetch submissions for this promotor today
             const { data: submissions, error } = await supabase
                 .from('vast_finance_data_new')
                 .select('id, customer_name, customer_phone, sale_date, status, approval_status, transaction_status, limit_amount, dp_amount, tenor, pekerjaan, penghasilan, has_npwp, image_urls')
-                .eq('created_by_user_id', promotor.user_id)
+                .eq('created_by_user_id', promotor.promoter_user_id)
                 .eq('sale_date', today)
                 .order('created_at', { ascending: false });
 
@@ -165,7 +162,7 @@ export default function ManagerDailyPage() {
     if (!data) return <DashboardLayout><Alert type="error" message="Data tidak tersedia" /></DashboardLayout>;
 
     // Filter by selected area only
-    const getFilteredAreas = (): Area[] => {
+    const getFilteredAreas = (): LocalArea[] => {
         if (selectedArea === 'all') return data.areas;
         return data.areas.filter(a => a.user_id === selectedArea);
     };
@@ -216,7 +213,7 @@ export default function ManagerDailyPage() {
         }
     };
 
-    const openSubmissionDetail = (submission: Submission) => {
+    const openSubmissionDetail = (submission: FinanceData) => {
         setSelectedSubmission(submission);
         setShowDetailModal(true);
     };
@@ -494,7 +491,7 @@ export default function ManagerDailyPage() {
                                                 </div>
                                                 <div className="flex gap-4 text-[11px] text-muted-foreground mb-2">
                                                     <span>{sub.customer_phone}</span>
-                                                    <span>{formatCurrency(sub.limit_amount)}</span>
+                                                    <span>{formatCurrency(sub.limit_amount || 0)}</span>
                                                     <span>{sub.tenor} bln</span>
                                                 </div>
                                                 {/* Photo Thumbnails */}
@@ -582,7 +579,7 @@ export default function ManagerDailyPage() {
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">Penghasilan</span>
-                                        <span className="font-medium text-foreground">{formatCurrency(selectedSubmission.penghasilan)}</span>
+                                        <span className="font-medium text-foreground">{formatCurrency(selectedSubmission.penghasilan || 0)}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">NPWP</span>
@@ -601,11 +598,11 @@ export default function ManagerDailyPage() {
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">Limit</span>
-                                        <span className="font-medium text-foreground">{formatCurrency(selectedSubmission.limit_amount)}</span>
+                                        <span className="font-medium text-foreground">{formatCurrency(selectedSubmission.limit_amount || 0)}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">DP</span>
-                                        <span className="font-medium text-foreground">{formatCurrency(selectedSubmission.dp_amount)}</span>
+                                        <span className="font-medium text-foreground">{formatCurrency(selectedSubmission.dp_amount || 0)}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">Tenor</span>

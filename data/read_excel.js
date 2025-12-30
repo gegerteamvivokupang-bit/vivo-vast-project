@@ -2,10 +2,10 @@
 const XLSX = require('xlsx');
 const fs = require('fs');
 
-const excelFilePath = 'F:\\gpt_crazy_vast\\Data Sheet Vast (3).xlsx';
+const excelFilePath = 'F:\\gpt_crazy_vast\\Data Sheet Vast data desmber.xlsx';
 
 console.log('='.repeat(80));
-console.log('MEMBACA FILE EXCEL: Data Sheet Vast (3).xlsx');
+console.log('MEMBACA FILE EXCEL: Data Sheet Vast data desmber.xlsx');
 console.log('='.repeat(80));
 
 try {

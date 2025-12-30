@@ -9,29 +9,21 @@ import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 
-interface DailyData {
-  total_input: number;
-  total_rejected: number;
-  total_pending: number;
-  total_closed: number;
-  total_closing_direct: number;
-  total_closing_followup: number;
-}
+// Shared Types
+import { AggDailyPromoter, AggMonthlyPromoter } from '@/types/api.types';
 
-interface MonthlyData {
-  total_input: number;
-  total_rejected: number;
-  total_pending: number;
-  total_closed: number;
-  total_closing_direct: number;
-  total_closing_followup: number;
-  target?: number;
+// Utilities
+import { parseSupabaseError, logError } from '@/lib/errors';
+import { calculateAchievement } from '@/lib/dashboard-logic';
+
+interface PromotorMonthlyData extends AggMonthlyPromoter {
+  target: number;
 }
 
 export default function PromotorDashboardPage() {
   const { user } = useAuth();
-  const [dailyData, setDailyData] = useState<DailyData | null>(null);
-  const [monthlyData, setMonthlyData] = useState<MonthlyData | null>(null);
+  const [dailyData, setDailyData] = useState<AggDailyPromoter | null>(null);
+  const [monthlyData, setMonthlyData] = useState<PromotorMonthlyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userStoreName, setUserStoreName] = useState<string>('');
@@ -94,8 +86,14 @@ export default function PromotorDashboardPage() {
 
       setMonthlyData(monthlyResult);
     } catch (err) {
-      console.error('Dashboard fetch error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load dashboard');
+      const apiError = parseSupabaseError(err);
+      logError(apiError, {
+        userId: user.id,
+        page: 'promotor-dashboard',
+        action: 'fetchDashboardData'
+      });
+      console.error('Dashboard fetch error:', apiError);
+      setError(apiError.message);
     } finally {
       setLoading(false);
     }
@@ -119,9 +117,7 @@ export default function PromotorDashboardPage() {
 
   const targetBulanan = monthlyData?.target || 0;
   const pencapaianBulanan = monthlyData?.total_input || 0;
-  const persentasePencapaian = targetBulanan > 0
-    ? Math.round((pencapaianBulanan / targetBulanan) * 100)
-    : 0;
+  const persentasePencapaian = calculateAchievement(pencapaianBulanan, targetBulanan);
 
   return (
     <DashboardLayout requiredRole="promotor">

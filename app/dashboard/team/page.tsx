@@ -12,42 +12,13 @@ import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { User, ChevronRight } from 'lucide-react';
 
-interface MonthlySummary {
-    target: number;
-    input: number;
-    closing: number;
-    pending: number;
-    rejected: number;
-}
+// Shared types
+import { SatorData, PromotorData, MonthlySummary, DailyData } from '@/types/api.types';
 
-interface DailyData {
-    total_input: number;
-    total_pending: number;
-    total_rejected: number;
-    total_closed: number;
-    promotor_active: number;
-    promotor_empty: number;
-}
-
-interface SatorData {
-    user_id: string;
-    name: string;
-    target: number;
-    total_input: number;
-    total_closed: number;
-    total_pending: number;
-    total_rejected: number;
-}
-
-interface PromotorData {
-    user_id: string;
-    name: string;
-    target: number;
-    total_input: number;
-    total_closed: number;
-    total_pending: number;
-    total_rejected: number;
-}
+// Utilities
+import { parseSupabaseError, retryWithBackoff, logError } from '@/lib/errors';
+import { processDualRoleSPV, calculateAchievement } from '@/lib/dashboard-logic';
+import { getCurrentMonthWITA } from '@/lib/date-utils';
 
 export default function SpvDashboardPage() {
     const { user } = useAuth();
@@ -108,18 +79,42 @@ export default function SpvDashboardPage() {
             }), { target: spvAdminTarget, input: 0, closing: 0, pending: 0, rejected: 0 });
             setSummary(totals);
 
-            const satorList: SatorData[] = monthlyData
+            // Separate SATORs and direct promotors
+            const directPromotors = monthlyData.filter((m: any) => m.role === 'promotor');
+
+            // Filter out caller from satorsRaw if they have direct promotors
+            // to avoid duplication (they'll be added as "self" SATOR below)
+            const satorsRaw = monthlyData
                 .filter((m: any) => m.role === 'sator')
-                .map((m: any) => ({
-                    user_id: m.user_id,
-                    name: m.name,
-                    target: m.target || 0,
-                    total_input: m.total_input || 0,
-                    total_closed: m.total_closed || 0,
-                    total_pending: m.total_pending || 0,
-                    total_rejected: m.total_rejected || 0,
-                }));
-            setSators(satorList);
+                .filter((m: any) => !(directPromotors.length > 0 && m.user_id === user?.id));
+
+            const satorList: SatorData[] = satorsRaw.map((m: any) => ({
+                user_id: m.user_id,
+                name: m.name,
+                target: m.target || 0,
+                total_input: m.total_input || 0,
+                total_closed: m.total_closed || 0,
+                total_pending: m.total_pending || 0,
+                total_rejected: m.total_rejected || 0,
+            }));
+
+            // Use centralized dual-role processing logic
+            const finalSators = processDualRoleSPV(
+                satorList,
+                directPromotors.map((p: any) => ({
+                    user_id: p.user_id,
+                    name: p.name,
+                    target: p.target || 0,
+                    total_input: p.total_input || 0,
+                    total_closed: p.total_closed || 0,
+                    total_pending: p.total_pending || 0,
+                    total_rejected: p.total_rejected || 0,
+                })),
+                { id: user?.id || '', name: user?.name || '' },
+                spvAdminTarget  // SPV's SATOR target
+            );
+
+            setSators(finalSators);
 
             const promotorList: PromotorData[] = monthlyData
                 .filter((m: any) => m.role === 'promotor')
@@ -156,14 +151,20 @@ export default function SpvDashboardPage() {
                 });
             }
         } catch (err) {
-            console.error(err);
-            setError('Gagal memuat data');
+            const apiError = parseSupabaseError(err);
+            logError(apiError, {
+                userId: user?.id,
+                page: 'team-dashboard-home',
+                action: 'fetchData'
+            });
+            console.error('Error loading dashboard:', apiError);
+            setError(apiError.message);
         } finally {
             setLoading(false);
         }
     };
 
-    const targetPercent = summary.target > 0 ? Math.round((summary.input / summary.target) * 100) : 0;
+    const targetPercent = calculateAchievement(summary.input, summary.target);
 
     if (loading) return <DashboardLayout><Loading message="Memuat dashboard..." /></DashboardLayout>;
     if (error) return <DashboardLayout><Alert type="error" message={error} /></DashboardLayout>;

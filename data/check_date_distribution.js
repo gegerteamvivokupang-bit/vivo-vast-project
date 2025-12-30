@@ -6,7 +6,7 @@
 const XLSX = require('xlsx');
 const fs = require('fs');
 
-const excelPath = 'F:\\gpt_crazy_vast\\Data Sheet Vast (3).xlsx';
+const excelPath = 'F:\\gpt_crazy_vast\\Data Sheet Vast data desmber.xlsx';
 
 console.log('='.repeat(80));
 console.log('CEK DISTRIBUSI TANGGAL - MASTER DATA ALL');

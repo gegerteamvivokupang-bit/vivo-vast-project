@@ -10,29 +10,23 @@ import { createClient } from '@/lib/supabase/client';
 import { Bell, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-interface Promotor {
-    user_id: string;
+// Shared Types
+import { AggMonthlyPromoter, RoleType } from '@/types/api.types';
+
+// Utilities
+import { parseSupabaseError, logError } from '@/lib/errors';
+import { calculateAchievement, calculateTimeGone, isUnderperform, getInitials } from '@/lib/dashboard-logic';
+import { getMonthName, getCurrentDateWITA } from '@/lib/date-utils';
+
+interface StorePromotor extends AggMonthlyPromoter {
     name: string;
-    total_input: number;
-    total_pending: number;
-    total_rejected: number;
-    total_closed: number;
     target: number;
+    user_id: string; // Required by PromotorData (for isUnderperform) - we map this to promoter_user_id too
 }
-
-interface FetchResult {
-    promotors: Promotor[];
-    callerTarget: number;
-}
-
-const getMonthName = (month: number): string => {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-    return months[month];
-};
 
 export default function StorePerformancePage() {
     const { user } = useAuth();
-    const [promotors, setPromotors] = useState<Promotor[]>([]);
+    const [promotors, setPromotors] = useState<StorePromotor[]>([]);
     const [satorTarget, setSatorTarget] = useState<number>(0);  // SATOR's admin-assigned target
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -45,17 +39,16 @@ export default function StorePerformancePage() {
         return { year: now.getFullYear(), month: now.getMonth() };
     });
 
-    const monthLabel = `${getMonthName(selectedMonth.month)} ${selectedMonth.year}`;
+    // Date state
+    const now = getCurrentDateWITA();
+
+    // Fix: getMonthName expects 1-12, but state uses 0-11
+    const monthLabel = `${getMonthName(selectedMonth.month + 1)} ${selectedMonth.year}`;
 
     // Time Gone Calculation
-    const now = new Date();
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const currentDay = now.getDate();
-    const timeGonePercent = Math.round((currentDay / daysInMonth) * 100);
-    const todayFormatted = now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short' });
+    const timeGonePercent = calculateTimeGone();
 
-    // Get user initials
-    const getInitials = (name: string) => name?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || 'U';
+    // Get user initials replaced by imported utility
 
     useEffect(() => {
         if (user) fetchData();
@@ -79,23 +72,29 @@ export default function StorePerformancePage() {
             const subordinates = data?.subordinates || [];
             const callerTarget = data?.callerTarget || data?.spvTarget || 0;  // SATOR's admin-assigned target
 
-            const promotorList: Promotor[] = subordinates
+            const promotorList: StorePromotor[] = subordinates
                 .filter((m: any) => m.role === 'promotor')
                 .map((m: any) => ({
-                    user_id: m.user_id,
+                    user_id: m.user_id, // For PromotorData compatibility
+                    promoter_user_id: m.user_id,
+                    agg_month: monthStr + '-01', // Approx
                     name: m.name,
                     total_input: m.total_input || 0,
                     total_pending: m.total_pending || 0,
                     total_rejected: m.total_rejected || 0,
                     total_closed: m.total_closed || 0,
+                    total_approved: m.total_approved || 0, // Ensure structure matches
+                    total_closing_direct: 0, // Default if not in view
+                    total_closing_followup: 0, // Default if not in view
                     target: m.target || 0,
                 }));
 
             setPromotors(promotorList);
             setSatorTarget(callerTarget);  // Set SATOR's admin-assigned target
         } catch (err) {
-            console.error(err);
-            setError('Gagal memuat data');
+            const apiError = parseSupabaseError(err);
+            logError(apiError, { userId: user?.id, page: 'store-dashboard', action: 'fetchData' });
+            setError(apiError.message);
         } finally {
             setLoading(false);
         }
@@ -126,21 +125,14 @@ export default function StorePerformancePage() {
 
     const isCurrentMonth = selectedMonth.year === now.getFullYear() && selectedMonth.month === now.getMonth();
 
-    // Calculate performance
-    const getPercent = (p: Promotor) => p.target > 0 ? Math.round((p.total_input / p.target) * 100) : 0;
-    const isUnderperform = (p: Promotor) => {
-        // Jika tidak ada input sama sekali = underperform
-        if (p.total_input === 0) return true;
-        // Jika ada target, cek pencapaian vs time gone
-        if (p.target > 0) {
-            return getPercent(p) < timeGonePercent;
-        }
-        // Jika tidak ada target tapi ada input = on track
-        return false;
-    };
+    // Calculate performance - Logic replaced by shared utilities
 
-    const performPromotors = promotors.filter(p => !isUnderperform(p));
-    const underPromotors = promotors.filter(p => isUnderperform(p));
+    // Note: isUnderperform imported from utils checks (input==0) or (target>0 && achievement < timeGone)
+    // We wrapped it to match the signature or just use it directly if type matches.
+    // Imported isUnderperform takes (PromotorData, timeGone). StorePromotor ~ PromotorData.
+
+    const performPromotors = promotors.filter(p => !isUnderperform(p, timeGonePercent));
+    const underPromotors = promotors.filter(p => isUnderperform(p, timeGonePercent));
     const displayList = activeTab === 'allteam' ? promotors : activeTab === 'perform' ? performPromotors : underPromotors;
 
     // Totals - use SATOR's admin-assigned target, NOT sum of promotor targets
@@ -153,7 +145,7 @@ export default function StorePerformancePage() {
 
     // Use SATOR's admin-assigned target
     const totalTarget = satorTarget;
-    const totalPercent = totalTarget > 0 ? Math.round((totals.input / totalTarget) * 100) : 0;
+    const totalPercent = calculateAchievement(totals.input, totalTarget);
 
     if (loading) return <DashboardLayout><Loading message="Memuat data..." /></DashboardLayout>;
     if (error) return <DashboardLayout><Alert type="error" message={error} /></DashboardLayout>;
@@ -348,7 +340,7 @@ export default function StorePerformancePage() {
                         <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
                             <table className="w-full text-xs">
                                 <thead className={`${activeTab === 'allteam' ? 'bg-primary' :
-                                        activeTab === 'perform' ? 'bg-emerald-500' : 'bg-red-500'
+                                    activeTab === 'perform' ? 'bg-emerald-500' : 'bg-red-500'
                                     }`}>
                                     <tr>
                                         <th className="py-2.5 pl-3 pr-2 text-left text-[10px] font-bold uppercase tracking-wider text-white">
@@ -369,13 +361,13 @@ export default function StorePerformancePage() {
                                 </thead>
                                 <tbody className="divide-y divide-border">
                                     {displayList.map((p) => {
-                                        const pct = getPercent(p);
+                                        const pct = calculateAchievement(p.total_input, p.target);
                                         const gap = Math.max(0, p.target - p.total_input);
-                                        const under = isUnderperform(p);
+                                        const under = isUnderperform(p, timeGonePercent);
 
                                         return (
                                             <tr
-                                                key={p.user_id}
+                                                key={p.promoter_user_id}
                                                 className={`transition-colors ${under && activeTab === 'under' ? 'bg-red-500/5 hover:bg-red-500/10' : 'hover:bg-muted/30'
                                                     }`}
                                             >

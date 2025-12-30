@@ -11,41 +11,29 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Calendar, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-interface Sator {
+// Shared Types
+import { AggDailyPromoter, FinanceData } from '@/types/api.types';
+
+// Utilities
+import { parseSupabaseError, logError } from '@/lib/errors';
+import { formatDateWITA, getCurrentDateWITA } from '@/lib/date-utils';
+import { formatCurrency } from '@/lib/dashboard-logic';
+
+interface SatorWithPromotors {
     user_id: string;
     name: string;
     promotor_ids: string[];
 }
 
-interface Promotor {
-    promoter_user_id: string;
+interface PromotorWithDetail extends AggDailyPromoter {
     promoter_name: string;
-    total_input: number;
-    total_closed: number;
-    total_pending: number;
-    total_rejected: number;
     sator_id?: string;
-}
-
-interface Submission {
-    id: string;
-    customer_name: string;
-    customer_phone: string;
-    sale_date: string;
-    status: string;
-    limit_amount: number;
-    dp_amount: number;
-    tenor: number;
-    pekerjaan: string;
-    penghasilan: number;
-    has_npwp: boolean;
-    image_urls: string[] | null;
 }
 
 export default function SpvDailyPage() {
     const { user } = useAuth();
-    const [promotors, setPromotors] = useState<Promotor[]>([]);
-    const [sators, setSators] = useState<Sator[]>([]);
+    const [promotors, setPromotors] = useState<PromotorWithDetail[]>([]);
+    const [sators, setSators] = useState<SatorWithPromotors[]>([]);
     const [selectedSator, setSelectedSator] = useState<string>('all');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -53,18 +41,18 @@ export default function SpvDailyPage() {
 
     // Modal states
     const [showModal, setShowModal] = useState(false);
-    const [modalPromotor, setModalPromotor] = useState<Promotor | null>(null);
-    const [modalSubmissions, setModalSubmissions] = useState<Submission[]>([]);
+    const [modalPromotor, setModalPromotor] = useState<PromotorWithDetail | null>(null);
+    const [modalSubmissions, setModalSubmissions] = useState<FinanceData[]>([]);
     const [modalLoading, setModalLoading] = useState(false);
 
     // Detail modal
     const [showDetailModal, setShowDetailModal] = useState(false);
-    const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
+    const [selectedSubmission, setSelectedSubmission] = useState<FinanceData | null>(null);
 
     // Date filter
     const [showDatePicker, setShowDatePicker] = useState(false);
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+    const now = getCurrentDateWITA();
+    const todayStr = formatDateWITA(now);
     const [selectedDate, setSelectedDate] = useState(todayStr);
 
     // Generate date options (last 7 days)
@@ -114,7 +102,7 @@ export default function SpvDailyPage() {
             setSators(satorsData);
 
             // Sort promotors: active first (by input desc), then empty
-            const sorted = promotorsData.sort((a: Promotor, b: Promotor) => {
+            const sorted = promotorsData.sort((a: PromotorWithDetail, b: PromotorWithDetail) => {
                 if (a.total_input === 0 && b.total_input > 0) return 1;
                 if (a.total_input > 0 && b.total_input === 0) return -1;
                 return b.total_input - a.total_input;
@@ -122,14 +110,20 @@ export default function SpvDailyPage() {
 
             setPromotors(sorted);
         } catch (err) {
-            console.error(err);
-            setError('Gagal memuat data');
+            const apiError = parseSupabaseError(err);
+            logError(apiError, {
+                userId: user?.id,
+                page: 'spv-dashboard-daily',
+                action: 'fetchData'
+            });
+            console.error('Error fetching daily data:', apiError);
+            setError(apiError.message);
         } finally {
             setLoading(false);
         }
     };
 
-    const openPromotorDetail = async (promotor: Promotor) => {
+    const openPromotorDetail = async (promotor: PromotorWithDetail) => {
         setModalPromotor(promotor);
         setModalLoading(true);
         setShowModal(true);
@@ -156,7 +150,7 @@ export default function SpvDailyPage() {
         }
     };
 
-    const openSubmissionDetail = (submission: Submission) => {
+    const openSubmissionDetail = (submission: FinanceData) => {
         setSelectedSubmission(submission);
         setShowDetailModal(true);
     };
@@ -174,9 +168,7 @@ export default function SpvDailyPage() {
         }
     };
 
-    const formatCurrency = (value: number) => {
-        return new Intl.NumberFormat('id-ID').format(value || 0);
-    };
+    // formatCurrency replaced by imported utility
 
     // Filter promotors by selected sator
     const filteredPromotors = selectedSator === 'all'
@@ -482,7 +474,7 @@ export default function SpvDailyPage() {
                                                 </div>
                                                 <div className="flex gap-4 text-[11px] text-muted-foreground mb-2">
                                                     <span>{sub.customer_phone}</span>
-                                                    <span>{formatCurrency(sub.limit_amount)}</span>
+                                                    <span>{formatCurrency(sub.limit_amount || 0)}</span>
                                                     <span>{sub.tenor} bln</span>
                                                 </div>
                                                 {/* Photo Thumbnails */}
@@ -569,7 +561,7 @@ export default function SpvDailyPage() {
                                         </div>
                                         <div className="flex justify-between">
                                             <span className="text-muted-foreground">Penghasilan</span>
-                                            <span className="font-medium text-foreground">{formatCurrency(selectedSubmission.penghasilan)}</span>
+                                            <span className="font-medium text-foreground">{formatCurrency(selectedSubmission.penghasilan || 0)}</span>
                                         </div>
                                         <div className="flex justify-between">
                                             <span className="text-muted-foreground">NPWP</span>
@@ -588,11 +580,11 @@ export default function SpvDailyPage() {
                                         </div>
                                         <div className="flex justify-between">
                                             <span className="text-muted-foreground">Limit</span>
-                                            <span className="font-medium text-foreground">{formatCurrency(selectedSubmission.limit_amount)}</span>
+                                            <span className="font-medium text-foreground">{formatCurrency(selectedSubmission.limit_amount || 0)}</span>
                                         </div>
                                         <div className="flex justify-between">
                                             <span className="text-muted-foreground">DP</span>
-                                            <span className="font-medium text-foreground">{formatCurrency(selectedSubmission.dp_amount)}</span>
+                                            <span className="font-medium text-foreground">{formatCurrency(selectedSubmission.dp_amount || 0)}</span>
                                         </div>
                                         <div className="flex justify-between">
                                             <span className="text-muted-foreground">Tenor</span>

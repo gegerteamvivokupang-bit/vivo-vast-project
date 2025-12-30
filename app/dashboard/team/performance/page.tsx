@@ -8,25 +8,24 @@ import { Loading } from '@/components/ui/loading';
 import { Alert } from '@/components/ui/alert';
 import { createClient } from '@/lib/supabase/client';
 
+// Shared types
+import { PromotorData } from '@/types/api.types';
+
+// Utilities
+import { parseSupabaseError, logError } from '@/lib/errors';
+import {
+    calculateAchievement,
+    isUnderperform as checkUnderperform,
+    calculateTimeGone
+} from '@/lib/dashboard-logic';
+
 // ============================================
 // INTERFACES
 // ============================================
-interface Promotor {
-    user_id: string;
-    name: string;
-    total_input: number;
-    total_pending: number;
-    total_rejected: number;
-    total_closed: number;
-    target: number;
-    sator_id?: string;
-    sator_name?: string;
-}
-
 interface Sator {
     user_id: string;
     name: string;
-    promotors: Promotor[];
+    promotors: PromotorData[];
     total_input: number;
     total_closed: number;
     total_pending: number;
@@ -36,7 +35,7 @@ interface Sator {
 
 interface MonthlyData {
     sators: Sator[];
-    allPromotors: Promotor[];
+    allPromotors: PromotorData[];
     totals: {
         target: number;
         total_input: number;
@@ -78,11 +77,9 @@ export default function TeamPerformancePage() {
     // Get month label
     const monthLabel = `${getMonthName(selectedMonth.month)} ${selectedMonth.year}`;
 
-    // Time Gone Calculation
+    // Time Gone Calculation - Use centralized logic
     const now = new Date();
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const currentDay = now.getDate();
-    const timeGonePercent = Math.round((currentDay / daysInMonth) * 100);
+    const timeGonePercent = calculateTimeGone(now);
 
     // ============================================
     // DATA FETCHING
@@ -111,8 +108,13 @@ export default function TeamPerformancePage() {
             const rawData = result?.subordinates || [];
 
             // Separate SATORs and direct promotors
-            const satorsRaw = rawData.filter((m: any) => m.role === 'sator');
             const directPromotors = rawData.filter((m: any) => m.role === 'promotor');
+
+            // Filter out caller from satorsRaw if they have direct promotors
+            // to avoid duplication (they'll be added as "self" SATOR below)
+            const satorsRaw = rawData
+                .filter((m: any) => m.role === 'sator')
+                .filter((m: any) => !(directPromotors.length > 0 && m.user_id === user?.id));
 
             // Build SATOR list with their promotors - PARALLEL for better performance
             const satorPromises = satorsRaw.map(async (sator: any) => {
@@ -140,18 +142,18 @@ export default function TeamPerformancePage() {
                     user_id: sator.user_id,
                     name: sator.name,
                     promotors,
-                    total_input: promotors.reduce((sum: number, p: Promotor) => sum + p.total_input, 0),
-                    total_closed: promotors.reduce((sum: number, p: Promotor) => sum + p.total_closed, 0),
-                    total_pending: promotors.reduce((sum: number, p: Promotor) => sum + p.total_pending, 0),
-                    total_rejected: promotors.reduce((sum: number, p: Promotor) => sum + p.total_rejected, 0),
-                    target: promotors.reduce((sum: number, p: Promotor) => sum + p.target, 0),
+                    total_input: promotors.reduce((sum: number, p: PromotorData) => sum + p.total_input, 0),
+                    total_closed: promotors.reduce((sum: number, p: PromotorData) => sum + p.total_closed, 0),
+                    total_pending: promotors.reduce((sum: number, p: PromotorData) => sum + p.total_pending, 0),
+                    total_rejected: promotors.reduce((sum: number, p: PromotorData) => sum + p.total_rejected, 0),
+                    target: promotors.reduce((sum: number, p: PromotorData) => sum + p.target, 0),
                 };
             });
 
             const sators: Sator[] = await Promise.all(satorPromises);
 
             // Collect all promotors for underperform view
-            let allPromotors: Promotor[] = [];
+            let allPromotors: PromotorData[] = [];
 
             // If SPV has direct promotors, add as "self" SATOR
             if (directPromotors.length > 0 && user) {
@@ -171,11 +173,11 @@ export default function TeamPerformancePage() {
                     user_id: user.id,
                     name: `${user.name}`,
                     promotors: selfPromotors,
-                    total_input: selfPromotors.reduce((sum: number, p: Promotor) => sum + p.total_input, 0),
-                    total_closed: selfPromotors.reduce((sum: number, p: Promotor) => sum + p.total_closed, 0),
-                    total_pending: selfPromotors.reduce((sum: number, p: Promotor) => sum + p.total_pending, 0),
-                    total_rejected: selfPromotors.reduce((sum: number, p: Promotor) => sum + p.total_rejected, 0),
-                    target: selfPromotors.reduce((sum: number, p: Promotor) => sum + p.target, 0),
+                    total_input: selfPromotors.reduce((sum: number, p: PromotorData) => sum + p.total_input, 0),
+                    total_closed: selfPromotors.reduce((sum: number, p: PromotorData) => sum + p.total_closed, 0),
+                    total_pending: selfPromotors.reduce((sum: number, p: PromotorData) => sum + p.total_pending, 0),
+                    total_rejected: selfPromotors.reduce((sum: number, p: PromotorData) => sum + p.total_rejected, 0),
+                    target: selfPromotors.reduce((sum: number, p: PromotorData) => sum + p.target, 0),
                 });
 
                 allPromotors = [...selfPromotors];
@@ -200,8 +202,14 @@ export default function TeamPerformancePage() {
             setData({ sators, allPromotors, totals });
 
         } catch (err) {
-            console.error(err);
-            setError('Gagal memuat data');
+            const apiError = parseSupabaseError(err);
+            logError(apiError, {
+                userId: user?.id,
+                page: 'team-performance',
+                action: 'fetchData'
+            });
+            console.error('Error loading performance data:', apiError);
+            setError(apiError.message);
         } finally {
             setLoading(false);
         }
@@ -240,22 +248,14 @@ export default function TeamPerformancePage() {
 
     // ============================================
     // ONTRACK & UNDERPERFORM LOGIC
+    // Using centralized utilities
     // ============================================
-    const isUnderperform = (p: Promotor): boolean => {
-        // Jika tidak ada input sama sekali = underperform
-        if (p.total_input === 0) return true;
-        // Jika ada target, cek pencapaian vs time gone
-        if (p.target > 0) {
-            const inputPercent = (p.total_input / p.target) * 100;
-            return inputPercent < timeGonePercent;
-        }
-        // Jika tidak ada target tapi ada input = on track
-        return false;
+    const isUnderperform = (p: PromotorData): boolean => {
+        return checkUnderperform(p, timeGonePercent);
     };
 
-    const getInputPercent = (p: Promotor): number => {
-        if (!p.target || p.target === 0) return 0;
-        return Math.round((p.total_input / p.target) * 100);
+    const getInputPercent = (p: PromotorData): number => {
+        return calculateAchievement(p.total_input, p.target);
     };
 
     // ============================================

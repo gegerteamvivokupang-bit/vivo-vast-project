@@ -11,26 +11,18 @@ import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { ChevronRight, Bell, User } from 'lucide-react';
 
-interface AreaSummary {
-    name: string;
-    spv_name: string;
-    user_id: string;
-    total_input: number;
-    total_pending: number;
-    total_rejected: number;
-    total_closed: number;
-    target: number;
-}
+// Shared types
+import { AreaSummary, DailyData } from '@/types/api.types';
 
-interface DailyData {
-    total_input: number;
-    total_pending: number;
-    total_rejected: number;
-    total_closed: number;
-    promotor_active: number;
-    promotor_empty: number;
-    date_formatted: string;
-}
+// Utilities
+import { parseSupabaseError, logError } from '@/lib/errors';
+import {
+    calculateAchievement,
+    calculateTimeGone,
+    getInitials,
+    calculateTotals
+} from '@/lib/dashboard-logic';
+import { formatDateReadable } from '@/lib/date-utils';
 
 export default function ManagerDashboardPage() {
     const { user } = useAuth();
@@ -41,12 +33,9 @@ export default function ManagerDashboardPage() {
     const [error, setError] = useState<string | null>(null);
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
-    // Time Gone
-    const now = new Date();
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const currentDay = now.getDate();
-    const timeGonePercent = Math.round((currentDay / daysInMonth) * 100);
-    const todayFormatted = now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short' });
+    // Time Gone Calculation - Use utilities
+    const todayFormatted = formatDateReadable();
+    const timeGonePercent = calculateTimeGone();
 
     useEffect(() => {
         if (user) fetchData();
@@ -72,12 +61,17 @@ export default function ManagerDashboardPage() {
                     total_closed: dailyRes.data.totals?.total_closed || 0,
                     promotor_active: dailyRes.data.promotor_stats?.active || 0,
                     promotor_empty: dailyRes.data.promotor_stats?.empty || 0,
-                    date_formatted: dailyRes.data.date_formatted || '',
                 });
             }
         } catch (err) {
-            console.error(err);
-            setError('Gagal memuat data');
+            const apiError = parseSupabaseError(err);
+            logError(apiError, {
+                userId: user?.id,
+                page: 'manager-dashboard-area',
+                action: 'fetchData'
+            });
+            console.error('Error fetching dashboard data:', apiError);
+            setError(apiError.message);
         } finally {
             setLoading(false);
         }
@@ -91,13 +85,19 @@ export default function ManagerDashboardPage() {
         target: acc.target + a.target,
     }), { total_input: 0, total_pending: 0, total_rejected: 0, total_closed: 0, target: 0 });
 
-    const totalPercent = totals.target > 0 ? Math.round((totals.total_input / totals.target) * 100) : 0;
+    const totalPercent = calculateAchievement(totals.total_input, totals.target);
 
+    // Logic for underperformance (replicated from dashboard-logic but specific for Area types if needed)
+    // Or we can just use manual check here since structure is slightly different
     const isUnderperform = (m: AreaSummary): boolean => {
-        const t = m.target || 0;
-        const i = m.total_input || 0;
-        if (t === 0) return true;
-        return (i / t) * 100 < timeGonePercent;
+        // No input = underperform
+        if (m.total_input === 0) return true;
+        // If target exists, compare achievement vs time gone
+        if (m.target > 0) {
+            const achievement = calculateAchievement(m.total_input, m.target);
+            return achievement < timeGonePercent;
+        }
+        return false;
     };
 
     const getStatusColor = (pct: number) => {
@@ -113,7 +113,7 @@ export default function ManagerDashboardPage() {
     };
 
     // Get user initials
-    const getInitials = (name: string) => name?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || 'U';
+    // user initials logic replaced by imported getInitials
 
     if (loading) return <DashboardLayout><Loading message="Memuat dashboard..." /></DashboardLayout>;
     if (error) return <DashboardLayout><Alert type="error" message={error} /></DashboardLayout>;

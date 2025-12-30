@@ -2,6 +2,7 @@ import './globals.css'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ToastProvider } from '@/components/ui/toast'
 import { ConfirmProvider } from '@/components/ui/confirm'
+import { SWRProvider } from '@/components/providers/SWRProvider'
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 
@@ -40,13 +41,15 @@ export default function RootLayout({
     <html lang="id" className={inter.variable}>
       <body className={`${inter.className} bg-background text-foreground antialiased`}>
         <AuthProvider initialUser={null}>
-          <ToastProvider>
-            <ConfirmProvider>
-              <div className="mx-auto min-h-screen max-w-md bg-background">
-                {children}
-              </div>
-            </ConfirmProvider>
-          </ToastProvider>
+          <SWRProvider>
+            <ToastProvider>
+              <ConfirmProvider>
+                <div className="mx-auto min-h-screen max-w-md bg-background">
+                  {children}
+                </div>
+              </ConfirmProvider>
+            </ToastProvider>
+          </SWRProvider>
         </AuthProvider>
       </body>
     </html>

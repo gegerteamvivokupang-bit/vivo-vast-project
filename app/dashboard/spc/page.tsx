@@ -8,19 +8,17 @@ import { ProfileSidebar } from '@/components/ProfileSidebar';
 import { Loading } from '@/components/ui/loading';
 import { Alert } from '@/components/ui/alert';
 import { createClient } from '@/lib/supabase/client';
-import { User, ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import html2canvas from 'html2canvas';
 
-interface PromotorData {
-    user_id: string;
-    name: string;
-    target?: number;
-    total_input: number;
-    total_closed: number;
-    total_pending: number;
-    total_rejected: number;
-}
+// Shared Types
+import { PromotorData } from '@/types/api.types';
+
+// Utilities
+import { parseSupabaseError, logError } from '@/lib/errors';
+import { calculateAchievement, calculateTimeGone, isUnderperform, getInitials } from '@/lib/dashboard-logic';
+import { getCurrentDateWITA, formatDateWITA, getMonthName } from '@/lib/date-utils';
 
 interface StoreData {
     store_id: string;
@@ -53,13 +51,8 @@ function canAccessSPC(user: { name?: string; role?: string } | null): boolean {
     return false;
 }
 
-const getMonthName = (month: number): string => {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-    return months[month];
-};
-
 const formatDate = (date: Date): string => {
-    return date.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' });
+    return formatDateWITA(date); // Use standard parser/formatter
 };
 
 export default function SPCDashboardPage() {
@@ -80,14 +73,14 @@ export default function SPCDashboardPage() {
 
     // Date selection
     const [selectedDate, setSelectedDate] = useState(() => {
-        const now = new Date();
+        const now = getCurrentDateWITA();
         return { year: now.getFullYear(), month: now.getMonth(), day: now.getDate() };
     });
 
     const [timeGonePercent, setTimeGonePercent] = useState(0);
 
-    const now = new Date();
-    const getInitials = (name: string) => name?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || 'U';
+    const now = getCurrentDateWITA();
+    // getInitials replaced by imported utility
 
     // Check access
     useEffect(() => {
@@ -134,11 +127,15 @@ export default function SPCDashboardPage() {
 
                 setStores(data.stores || []);
                 setTotals(data.totals || { input: 0, closed: 0, pending: 0, rejected: 0, target: 0 });
-                setTimeGonePercent(data.timeGonePercent || 100);
+                setStores(data.stores || []);
+                setTotals(data.totals || { input: 0, closed: 0, pending: 0, rejected: 0, target: 0 });
+                // Use standard calculation for consistency
+                setTimeGonePercent(calculateTimeGone());
             }
-        } catch (err: any) {
-            console.error(err);
-            setError(err.message || 'Gagal memuat data');
+        } catch (err) {
+            const apiError = parseSupabaseError(err);
+            logError(apiError, { userId: user?.id, page: 'spc-dashboard', action: 'fetchData' });
+            setError(apiError.message);
         } finally {
             setLoading(false);
         }
@@ -188,29 +185,30 @@ export default function SPCDashboardPage() {
             const date = new Date(selectedDate.year, selectedDate.month, selectedDate.day);
             return formatDate(date);
         }
-        return `${getMonthName(selectedDate.month)} ${selectedDate.year}`;
+        // Fix: Month is 0-indexed in state, 1-indexed in utils
+        return `${getMonthName(selectedDate.month + 1)} ${selectedDate.year}`;
     };
 
     // Performance calculation
-    const getPercent = (store: StoreData) => {
-        if (viewMode === 'daily') return 0; // No target for daily
-        const target = store.target || 0;
-        return target > 0 ? Math.round((store.total_input / target) * 100) : 0;
-    };
+    // getPercent replaced by calculateAchievement where needed
 
-    const isUnderperform = (store: StoreData) => {
+    const checkStoreUnderperform = (store: StoreData) => {
         if (viewMode === 'daily') return false;
-        const target = store.target || 0;
-        if (target === 0) return true;
-        return getPercent(store) < timeGonePercent;
+        // Map StoreData to PromotorData shape for isUnderperform
+        const pData = {
+            total_input: store.total_input,
+            target: store.target || 0,
+            user_id: store.store_id // dummy for type compliance?
+        } as any;
+        return isUnderperform(pData, timeGonePercent);
     };
 
-    const totalPercent = totals.target > 0 ? Math.round((totals.input / totals.target) * 100) : 0;
+    const totalPercent = calculateAchievement(totals.input, totals.target);
 
     // Period label untuk export
     const periodLabel = viewMode === 'daily'
         ? `${selectedDate.day}/${selectedDate.month + 1}/${selectedDate.year}`
-        : `${getMonthName(selectedDate.month).toUpperCase()} ${selectedDate.year}`;
+        : `${getMonthName(selectedDate.month + 1).toUpperCase()} ${selectedDate.year}`;
 
     // Handle Export PNG
     const handleExportPNG = async () => {
@@ -442,8 +440,8 @@ export default function SPCDashboardPage() {
                                         {stores
                                             .sort((a, b) => b.total_input - a.total_input)
                                             .map((store) => {
-                                                const pct = getPercent(store);
-                                                const under = isUnderperform(store);
+                                                const pct = calculateAchievement(store.total_input, store.target || 0);
+                                                const under = checkStoreUnderperform(store);
 
                                                 return (
                                                     <tr
@@ -538,7 +536,7 @@ export default function SPCDashboardPage() {
                             </thead>
                             <tbody>
                                 {stores.map((store, idx) => {
-                                    const pct = getPercent(store);
+                                    const pct = calculateAchievement(store.total_input, store.target || 0);
                                     return (
                                         <tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#faf5ff' }}>
                                             <td style={{ padding: '8px 12px', fontWeight: '600', color: '#581c87', borderBottom: '1px solid #e9d5ff' }}>{store.store_name}</td>

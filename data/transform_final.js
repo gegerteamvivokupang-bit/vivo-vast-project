@@ -6,10 +6,10 @@
 const XLSX = require('xlsx');
 const fs = require('fs');
 
-const excelPath = 'F:\\gpt_crazy_vast\\Data Sheet Vast (3).xlsx';
+const excelPath = 'F:\\gpt_crazy_vast\\Data Sheet Vast data desmber.xlsx';
 
 console.log('='.repeat(80));
-console.log('TRANSFORMASI DATA DESEMBER 2025 (ROBUST VERSION)');
+console.log('TRANSFORMASI DATA DARI 26 DESEMBER 2025');
 console.log('='.repeat(80));
 
 // Baca semua sheet
@@ -140,19 +140,21 @@ function normalizeStatus(status) {
     return { status: 'reject', approval: 'rejected', transaction: 'not_closed' };
 }
 
-// Filter Desember 2025
+// Filter 26-29 Desember 2025 (tanpa tanggal 30)
 console.log('\n' + '='.repeat(80));
-console.log('FILTER DATA DESEMBER 2025');
+console.log('FILTER DATA 26-29 DESEMBER 2025');
 console.log('='.repeat(80));
 
+const startDate = new Date('2025-12-26');
+const endDate = new Date('2025-12-30');  // Sampai sebelum tanggal 30
 const desemberData = masterData.filter(row => {
     const timestamp = row['Timestamp'];
     if (!timestamp) return false;
     const date = excelDateToJSDate(timestamp);
-    return date.getFullYear() === 2025 && date.getMonth() + 1 === 12;
+    return date >= startDate && date < endDate;  // 26-29 Des saja
 });
 
-console.log(`\n✅ Ditemukan ${desemberData.length} records Desember 2025`);
+console.log(`\n✅ Ditemukan ${desemberData.length} records (26-29 Desember 2025)`);
 
 // Transform data
 console.log('\n' + '='.repeat(80));
