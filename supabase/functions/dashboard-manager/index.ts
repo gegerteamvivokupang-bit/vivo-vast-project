@@ -61,10 +61,15 @@ Deno.serve(async (req) => {
             )
         }
 
-        console.log(`TURBO Result: ${fullHierarchy.areas?.length || 0} areas, ${fullHierarchy.sators?.length || 0} sators, ${fullHierarchy.promotors?.length || 0} promotors`);
+        // Parse JSON response (RPC returns JSON string)
+        const parsedData = typeof fullHierarchy === 'string'
+            ? JSON.parse(fullHierarchy)
+            : fullHierarchy;
+
+        console.log(`TURBO Result: ${parsedData?.areas?.length || 0} areas, ${parsedData?.sators?.length || 0} sators, ${parsedData?.promotors?.length || 0} promotors`);
 
         return new Response(
-            JSON.stringify(fullHierarchy),
+            JSON.stringify(parsedData),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
 

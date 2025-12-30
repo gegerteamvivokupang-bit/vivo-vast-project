@@ -77,25 +77,25 @@ Deno.serve(async (req) => {
         }
 
         // Data is already merged and ready to use
-        const subordinates = teamData || []
-        const callerTarget = subordinates.length > 0 ? subordinates[0].manager_target : 0
+        const teamMembers = teamData || []
+        const callerTarget = teamMembers.length > 0 ? teamMembers[0].out_manager_target : 0
 
-        console.log('Turbo Query returned:', subordinates.length, 'team members, Caller target:', callerTarget)
+        console.log('Turbo Query returned:', teamMembers.length, 'team members, Caller target:', callerTarget)
 
-        // Return response
+        // Return response - map out_ prefixed columns to original names
         return new Response(
             JSON.stringify({
-                subordinates: subordinates.map(item => ({
-                    user_id: item.user_id,
-                    name: item.name,
-                    role: item.role,
-                    employee_id: item.employee_id,
-                    total_input: item.total_input,
-                    total_rejected: item.total_rejected,
-                    total_pending: item.total_pending,
-                    total_closed: item.total_closed,
-                    agg_month: item.agg_month,
-                    target: item.target
+                subordinates: teamMembers.map((item: any) => ({
+                    user_id: item.out_user_id,
+                    name: item.out_name,
+                    role: item.out_role,
+                    employee_id: item.out_employee_id,
+                    total_input: item.out_total_input,
+                    total_rejected: item.out_total_rejected,
+                    total_pending: item.out_total_pending,
+                    total_closed: item.out_total_closed,
+                    agg_month: item.out_agg_month,
+                    target: item.out_target
                 })),
                 spvTarget: callerTarget,
                 callerTarget: callerTarget
