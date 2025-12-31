@@ -7,9 +7,9 @@ import ManagerHeader from '@/components/ManagerHeader';
 import { Loading } from '@/components/ui/loading';
 import { Alert } from '@/components/ui/alert';
 import { createClient } from '@/lib/supabase/client';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Calendar, Check, X } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { cn } from '@/lib/utils'; // Restore cn import
+import { cn } from '@/lib/utils';
 
 // Shared Types
 import { AggDailyPromoter, FinanceData } from '@/types/api.types';
@@ -94,15 +94,35 @@ export default function ManagerDailyPage() {
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [selectedSubmission, setSelectedSubmission] = useState<FinanceData | null>(null);
 
+    // Date filter state
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const now = getCurrentDateWITA();
+    const todayStr = formatDateWITA(now);
+    const [selectedDate, setSelectedDate] = useState(todayStr);
+
+    // Generate date options (last 7 days)
+    const dateOptions = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        const value = d.toISOString().split('T')[0];
+        const label = i === 0 ? 'Hari Ini' : i === 1 ? 'Kemarin' : d.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' });
+        return { value, label };
+    });
+
+    const selectedDateLabel = dateOptions.find(d => d.value === selectedDate)?.label ||
+        new Date(selectedDate).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' });
+
     useEffect(() => {
         if (user) fetchData();
-    }, [user]);
+    }, [user, selectedDate]);
 
     const fetchData = async () => {
         setLoading(true);
         try {
             const supabase = createClient();
-            const { data: result, error: fnError } = await supabase.functions.invoke('dashboard-manager-daily');
+            const { data: result, error: fnError } = await supabase.functions.invoke('dashboard-manager-daily', {
+                body: { date: selectedDate }
+            });
 
             if (fnError) throw fnError;
             setData(result);
@@ -124,16 +144,21 @@ export default function ManagerDailyPage() {
         try {
             const supabase = createClient();
 
-            // Get today in WITA
-            // Get today in WITA using updated utility
-            const today = formatDateWITA(getCurrentDateWITA());
+            // Get promotor ID (handle both field names)
+            const promotorId = promotor.promoter_user_id || promotor.user_id;
 
-            // Fetch submissions for this promotor today
+            if (!promotorId) {
+                console.error('Promotor ID not found');
+                setModalSubmissions([]);
+                return;
+            }
+
+            // Fetch submissions for this promotor on selected date
             const { data: submissions, error } = await supabase
                 .from('vast_finance_data_new')
                 .select('id, customer_name, customer_phone, sale_date, status, approval_status, transaction_status, limit_amount, dp_amount, tenor, pekerjaan, penghasilan, has_npwp, image_urls')
-                .eq('created_by_user_id', promotor.promoter_user_id)
-                .eq('sale_date', today)
+                .eq('created_by_user_id', promotorId)
+                .eq('sale_date', selectedDate)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -224,11 +249,51 @@ export default function ManagerDailyPage() {
 
                 <ManagerHeader
                     title="PROGRESS HARIAN"
-                    subtitle={data.date_formatted}
+                    subtitle={selectedDateLabel}
                     backUrl="/dashboard/area"
                 />
 
                 <div className="p-3">
+                    {/* Date Picker Button */}
+                    <button
+                        onClick={() => setShowDatePicker(true)}
+                        className="w-full flex items-center gap-3 bg-card border border-border rounded-xl px-4 py-3 mb-3 shadow-sm active:scale-[0.98] transition-all"
+                    >
+                        <Calendar className="w-5 h-5 text-primary shrink-0" />
+                        <span className="flex-1 text-left text-foreground text-sm font-bold">{selectedDateLabel}</span>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground rotate-90" />
+                    </button>
+
+                    {/* Bottom Sheet Date Picker */}
+                    {showDatePicker && (
+                        <div className="fixed inset-0 z-50 flex items-end justify-center">
+                            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowDatePicker(false)} />
+                            <div className="relative w-full max-w-lg bg-card rounded-t-3xl p-5 pb-8 animate-in slide-in-from-bottom">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-lg font-bold text-foreground">Pilih Tanggal</h3>
+                                    <button onClick={() => setShowDatePicker(false)} className="p-2 rounded-full hover:bg-muted">
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
+                                <div className="space-y-2">
+                                    {dateOptions.map(opt => (
+                                        <button
+                                            key={opt.value}
+                                            onClick={() => { setSelectedDate(opt.value); setShowDatePicker(false); }}
+                                            className={cn(
+                                                "w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors",
+                                                selectedDate === opt.value ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80 text-foreground"
+                                            )}
+                                        >
+                                            <span className="font-medium">{opt.label}</span>
+                                            {selectedDate === opt.value && <Check className="w-5 h-5" />}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Area Selection Tabs */}
                     <div className="grid grid-cols-4 gap-1.5 mb-3">
                         <button

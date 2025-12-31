@@ -1,10 +1,13 @@
 // VAST FINANCE - Dashboard Layout Component
 // Wrapper untuk semua dashboard pages dengan auth check dan role-based access
+// UPDATED: Responsive support - sidebar di desktop untuk manager/admin
 
 'use client'
 
 import BottomNav from '@/components/BottomNav'
+import { DesktopSidebar } from '@/components/DesktopSidebar'
 import { useAuth } from '@/contexts/AuthContext'
+import { useResponsive } from '@/hooks/useResponsive'
 import { redirect } from 'next/navigation'
 import { Loading } from '@/components/ui/loading'
 import { cn } from '@/lib/utils'
@@ -15,6 +18,7 @@ interface DashboardLayoutProps {
   allowedRoles?: string[]
   requiredRole?: string | string[]
   className?: string
+  showDesktopSidebar?: boolean // Enable sidebar on desktop for manager/admin
 }
 
 export default function DashboardLayout({
@@ -23,8 +27,10 @@ export default function DashboardLayout({
   allowedRoles,
   requiredRole,
   className,
+  showDesktopSidebar = false,
 }: DashboardLayoutProps) {
   const { user, loading } = useAuth()
+  const { isDesktop } = useResponsive()
 
   if (loading) {
     return <Loading message="Memuat dashboard..." />
@@ -40,16 +46,36 @@ export default function DashboardLayout({
     redirect('/unauthorized')
   }
 
+  // Determine if sidebar should be shown (for manager/admin on desktop)
+  const shouldShowSidebar = showDesktopSidebar && isDesktop && ['manager', 'admin'].includes(user.role)
+  // BottomNav: Always show EXCEPT when desktop sidebar is active
+  const shouldShowBottomNav = !(showDesktopSidebar && isDesktop && ['manager', 'admin'].includes(user.role))
+
   return (
-    <div className={cn("min-h-screen pb-20 bg-background", className)}>
-      {title && (
-        <header className="bg-card px-6 py-4 shadow-md border-b">
-          <h1 className="text-xl font-bold text-foreground">{title}</h1>
-          <p className="text-sm text-muted-foreground">{user.name}</p>
-        </header>
+    <div className="min-h-screen bg-background">
+      {/* Desktop Sidebar for Manager/Admin */}
+      {showDesktopSidebar && ['manager', 'admin'].includes(user.role) && (
+        <DesktopSidebar />
       )}
-      <main>{children}</main>
-      <BottomNav />
+
+      {/* Main Content */}
+      <div className={cn(
+        "min-h-screen",
+        shouldShowSidebar ? "lg:ml-64" : "", // Add left margin on desktop when sidebar shown
+        shouldShowBottomNav ? "pb-20" : "", // Bottom padding for mobile nav
+        className
+      )}>
+        {title && (
+          <header className="bg-card px-6 py-4 shadow-md border-b">
+            <h1 className="text-xl font-bold text-foreground">{title}</h1>
+            <p className="text-sm text-muted-foreground">{user.name}</p>
+          </header>
+        )}
+        <main>{children}</main>
+      </div>
+
+      {/* Bottom Nav - only on mobile or for non-manager/admin */}
+      {shouldShowBottomNav && <BottomNav />}
     </div>
   )
 }

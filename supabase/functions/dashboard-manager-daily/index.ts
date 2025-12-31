@@ -22,22 +22,33 @@ Deno.serve(async (req) => {
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         )
 
-        // Get today's date in WITA timezone
-        const today = new Intl.DateTimeFormat('en-CA', {
-            timeZone: 'Asia/Makassar',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit'
-        }).format(new Date())
+        // Parse request body for date parameter
+        let targetDate: string
+        try {
+            const body = await req.json()
+            targetDate = body?.date || ''
+        } catch {
+            targetDate = ''
+        }
 
-        console.log('Manager Daily Dashboard TURBO - Fetching for:', today)
+        // If no date provided, use today's date in WITA timezone
+        if (!targetDate || !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+            targetDate = new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'Asia/Makassar',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            }).format(new Date())
+        }
+
+        console.log('Manager Daily Dashboard TURBO - Fetching for:', targetDate)
 
         // TURBO QUERY: Single RPC call replaces MASSIVE nested loops
         // Old: Multiple queries + 3 levels of nested loops (SPV → SATOR → PROMOTOR)
         // New: 1 RPC call with complete hierarchy pre-built
         const { data: fullHierarchy, error: rpcError } = await supabaseClient
             .rpc('get_manager_daily_hierarchy', {
-                p_date: today
+                p_date: targetDate
             })
 
         if (rpcError) {
