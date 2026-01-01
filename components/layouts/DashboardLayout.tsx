@@ -40,10 +40,18 @@ export default function DashboardLayout({
     redirect('/login')
   }
 
-  // Role-based access control
+  // Role-based access control - Only check if user has a valid role
   const rolesToCheck = allowedRoles || (requiredRole ? (Array.isArray(requiredRole) ? requiredRole : [requiredRole]) : [])
-  if (rolesToCheck.length > 0 && !rolesToCheck.includes(user.role)) {
-    redirect('/unauthorized')
+
+  // Only enforce role check if:
+  // 1. We have roles to check
+  // 2. User exists
+  // 3. User has a valid role property
+  if (rolesToCheck.length > 0 && user.role) {
+    if (!rolesToCheck.includes(user.role)) {
+      console.warn(`[DashboardLayout] Role mismatch - User role: ${user.role}, Allowed: ${rolesToCheck.join(', ')}`)
+      redirect('/unauthorized')
+    }
   }
 
   // Determine if sidebar should be shown (for manager/admin on desktop)
