@@ -100,8 +100,8 @@ export default function ManagerDailyPage() {
     const todayStr = formatDateWITA(now);
     const [selectedDate, setSelectedDate] = useState(todayStr);
 
-    // Generate date options (last 7 days)
-    const dateOptions = Array.from({ length: 7 }, (_, i) => {
+    // Generate date options (last 30 days)
+    const dateOptions = Array.from({ length: 30 }, (_, i) => {
         const d = new Date(now);
         d.setDate(d.getDate() - i);
         const value = d.toISOString().split('T')[0];
@@ -275,7 +275,7 @@ export default function ManagerDailyPage() {
                                         <X className="w-5 h-5" />
                                     </button>
                                 </div>
-                                <div className="space-y-2">
+                                <div className="space-y-2 max-h-[60vh] overflow-y-auto">
                                     {dateOptions.map(opt => (
                                         <button
                                             key={opt.value}

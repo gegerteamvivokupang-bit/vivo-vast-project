@@ -30,32 +30,12 @@ export default function PromotorDashboardPage() {
 
   useEffect(() => {
     if (user) {
-      fetchDashboardData();
-      fetchUserStore();
+      fetchAllData();
     }
   }, [user]);
 
-  const fetchUserStore = async () => {
-    try {
-      const supabase = createClient();
-      if (user?.id) {
-        const { data: hierarchyData } = await supabase
-          .from('hierarchy')
-          .select('stores(name)')
-          .eq('user_id', user.id)
-          .single();
-
-        if (hierarchyData?.stores) {
-          const stores = hierarchyData.stores as any;
-          setUserStoreName(stores?.name || '');
-        }
-      }
-    } catch (err) {
-      console.error('Fetch user store error:', err);
-    }
-  };
-
-  const fetchDashboardData = async () => {
+  // OPTIMIZED: Run all API calls in parallel
+  const fetchAllData = async () => {
     if (!user?.id) return;
 
     setLoading(true);
@@ -64,33 +44,50 @@ export default function PromotorDashboardPage() {
     try {
       const supabase = createClient();
 
-      const { data: dailyResult, error: dailyError } = await supabase.functions.invoke(
-        'dashboard-promotor-daily',
-        { body: { userId: user.id } }
-      );
+      // Run all requests in parallel for faster loading
+      const [storeResult, dailyResult, monthlyResult] = await Promise.all([
+        // Get user store
+        supabase
+          .from('hierarchy')
+          .select('stores(name)')
+          .eq('user_id', user.id)
+          .single(),
 
-      if (dailyError) {
+        // Get daily data
+        supabase.functions.invoke('dashboard-promotor-daily', {
+          body: { userId: user.id }
+        }),
+
+        // Get monthly data
+        supabase.functions.invoke('dashboard-promotor-monthly', {
+          body: { userId: user.id }
+        })
+      ]);
+
+      // Handle store data
+      if (storeResult.data?.stores) {
+        const stores = storeResult.data.stores as any;
+        setUserStoreName(stores?.name || '');
+      }
+
+      // Handle daily data
+      if (dailyResult.error) {
         throw new Error('Failed to fetch daily data');
       }
+      setDailyData(dailyResult.data);
 
-      setDailyData(dailyResult);
-
-      const { data: monthlyResult, error: monthlyError } = await supabase.functions.invoke(
-        'dashboard-promotor-monthly',
-        { body: { userId: user.id } }
-      );
-
-      if (monthlyError) {
+      // Handle monthly data
+      if (monthlyResult.error) {
         throw new Error('Failed to fetch monthly data');
       }
+      setMonthlyData(monthlyResult.data);
 
-      setMonthlyData(monthlyResult);
     } catch (err) {
       const apiError = parseSupabaseError(err);
       logError(apiError, {
         userId: user.id,
         page: 'promotor-dashboard',
-        action: 'fetchDashboardData'
+        action: 'fetchAllData'
       });
       console.error('Dashboard fetch error:', apiError);
       setError(apiError.message);

@@ -243,29 +243,39 @@ export default function ExportPage() {
 
             setSators(satorList);
 
+
+            // Get complete promotor list from daily data (includes hierarchy)
             let promotorList: TeamMember[] = [...directPromotorsWithDaily];
 
-            for (const sator of satorListFromData) {
-                const { data: satorSubs } = await supabase.functions.invoke('dashboard-team-monthly', {
-                    body: { userId: sator.user_id }
-                });
-                const satorSubData = satorSubs?.subordinates || [];
-                if (satorSubData.length > 0) {
-                    const satorPromotors = satorSubData.filter((m: TeamMember) => m.role === 'promotor').map((p: TeamMember) => {
-                        const daily = dailyPromotorMap.get(p.user_id);
-                        return {
-                            ...p,
-                            daily_input: daily?.total_input || 0,
-                            daily_closed: daily?.total_closed || 0,
-                            daily_pending: daily?.total_pending || 0,
-                            daily_rejected: daily?.total_rejected || 0
-                        };
+            // Add promotors from sators using daily data as reference
+            if (dailyData?.sators) {
+                for (const dailySator of dailyData.sators as DailySator[]) {
+                    // Fetch monthly data for this sator to get complete promotor info
+                    // (fetch even if no daily data, as they may have monthly data)
+                    const { data: satorMonthlyData } = await supabase.functions.invoke('dashboard-team-monthly', {
+                        body: { userId: dailySator.user_id }
                     });
+
+                    const satorSubData = satorMonthlyData?.subordinates || [];
+                    const satorPromotors = satorSubData
+                        .filter((m: TeamMember) => m.role === 'promotor')
+                        .map((p: TeamMember) => {
+                            const daily = dailyPromotorMap.get(p.user_id);
+                            return {
+                                ...p,
+                                daily_input: daily?.total_input || 0,
+                                daily_closed: daily?.total_closed || 0,
+                                daily_pending: daily?.total_pending || 0,
+                                daily_rejected: daily?.total_rejected || 0
+                            };
+                        });
+
                     promotorList = [...promotorList, ...satorPromotors];
                 }
             }
 
             setAllPromotors(promotorList);
+
 
             // Fetch SPC data (monthly + daily) if user has access
             if (canAccessSPC(user)) {

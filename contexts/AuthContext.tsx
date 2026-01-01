@@ -114,14 +114,20 @@ export function AuthProvider({
 
   useEffect(() => {
     async function initSession() {
-      // Small delay to ensure cookies are set
-      await new Promise(r => setTimeout(r, 150))
+      // If we already have initialUser, no need to fetch
+      if (initialUser) {
+        setLoading(false)
+        return
+      }
+
+      // Minimal delay to ensure cookies are ready
+      await new Promise(r => setTimeout(r, 50))
       await fetchCurrentUser()
       setLoading(false)
     }
 
     initSession()
-  }, [fetchCurrentUser])
+  }, [fetchCurrentUser, initialUser])
 
   return (
     <AuthContext.Provider value={{ user, loading, signOut, refreshProfile }}>
