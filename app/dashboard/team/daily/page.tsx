@@ -55,12 +55,19 @@ export default function SpvDailyPage() {
     const todayStr = formatDateWITA(now);
     const [selectedDate, setSelectedDate] = useState(todayStr);
 
-    // Generate date options (last 30 days)
+    // Generate date options (last 30 days) - Using WITA timezone consistently
     const dateOptions = Array.from({ length: 30 }, (_, i) => {
         const d = new Date(now);
         d.setDate(d.getDate() - i);
-        const value = d.toISOString().split('T')[0];
-        const label = i === 0 ? 'Hari Ini' : i === 1 ? 'Kemarin' : d.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' });
+        // FIX: Use formatDateWITA instead of toISOString to avoid UTC timezone issue
+        const value = formatDateWITA(d);
+        // Pure date format instead of "Hari Ini"/"Kemarin"
+        const label = d.toLocaleDateString('id-ID', {
+            timeZone: 'Asia/Makassar',
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short'
+        });
         return { value, label };
     });
 

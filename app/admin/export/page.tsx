@@ -39,8 +39,16 @@ export default function ExportPage() {
         const start = new Date(now.getFullYear(), now.getMonth(), 1)
         const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
 
-        setStartDate(start.toISOString().split('T')[0])
-        setEndDate(end.toISOString().split('T')[0])
+        // FIX: Use WITA timezone instead of UTC toISOString
+        const formatWITA = (date: Date) => new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Makassar',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        }).format(date)
+
+        setStartDate(formatWITA(start))
+        setEndDate(formatWITA(end))
     }, [])
 
     const handleExport = async () => {

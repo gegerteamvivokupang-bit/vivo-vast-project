@@ -109,7 +109,13 @@ export default function ReportPage() {
     const changeDate = (days: number) => {
         const current = new Date(selectedDate + 'T00:00:00');
         current.setDate(current.getDate() + days);
-        const newDate = current.toISOString().split('T')[0];
+        // FIX: Use WITA timezone instead of UTC toISOString
+        const newDate = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Makassar',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        }).format(current);
         setSelectedDate(newDate);
     };
 

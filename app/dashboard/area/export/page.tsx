@@ -5,9 +5,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
 import { ProfileSidebar } from '@/components/ProfileSidebar';
 import { Loading } from '@/components/ui/loading';
-import { Alert } from '@/components/ui/alert';
 import { createClient } from '@/lib/supabase/client';
-import { ArrowLeft, Download, FileSpreadsheet, Image, User, Eye, Check } from 'lucide-react';
+import { ArrowLeft, Download, FileSpreadsheet, Image, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
@@ -45,6 +44,7 @@ interface StoreData {
     daily_pending?: number;
     daily_rejected?: number;
     promotors?: {
+        user_id: string;
         name: string;
         target?: number;
         total_input: number;
@@ -101,33 +101,37 @@ export default function ManagerExportPage() {
     const [exporting, setExporting] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
+    // Refs for PNG Export
     const areaTableRef = useRef<HTMLDivElement>(null);
     const satorTableRef = useRef<HTMLDivElement>(null);
+    const promotorTableRef = useRef<HTMLDivElement>(null);
     const spcTableRef = useRef<HTMLDivElement>(null);
-    const previewRef = useRef<HTMLDivElement>(null);
-    const reportRef = useRef<HTMLDivElement>(null);
 
-    const [includePerformance, setIncludePerformance] = useState(true);
+    // Export Options State
+    const [includePerformance, setIncludePerformance] = useState(false);
     const [includeUnderperform, setIncludeUnderperform] = useState(false);
     const [includeSpcData, setIncludeSpcData] = useState(false);
     const [exportFormat, setExportFormat] = useState<'excel' | 'png'>('excel');
-    const [showPreview, setShowPreview] = useState(false);
 
+    // Time Gone & Month Selection
     const now = new Date();
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const currentDay = now.getDate();
-    const timeGonePercent = Math.round((currentDay / daysInMonth) * 100);
-    const periodLabel = now.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }).toUpperCase();
+    const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const [selectedMonth, setSelectedMonth] = useState(currentMonthStr);
+
+    const selectedDate = new Date(`${selectedMonth}-01`);
+    const isCurrentMonth = selectedMonth === currentMonthStr;
+    const daysInSelectedMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0).getDate();
+    const dayProgress = isCurrentMonth ? now.getDate() : daysInSelectedMonth;
+    const timeGonePercent = Math.round((dayProgress / daysInSelectedMonth) * 100);
+    const periodLabel = selectedDate.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }).toUpperCase();
 
     const totalGlobalInput = areas.reduce((acc, a) => acc + (a.total_input || 0), 0);
-    const totalGlobalTarget = areas.reduce((acc, a) => acc + (a.target || 0), 0);
 
-    // Get user initials
     const getInitials = (name: string) => name?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || 'U';
 
     useEffect(() => {
         if (user) fetchData();
-    }, [user]);
+    }, [user, selectedMonth]);
 
     const isUnderperform = (m: Member | StoreData): boolean => {
         const t = m.target || 0;
@@ -143,8 +147,12 @@ export default function ManagerExportPage() {
 
             // Fetch manager area data (monthly) dan daily data secara paralel
             const [monthlyResponse, dailyResponse] = await Promise.all([
-                supabase.functions.invoke('dashboard-manager'),
-                supabase.functions.invoke('dashboard-manager-daily')
+                supabase.functions.invoke('dashboard-manager', {
+                    body: { userId: user?.id, month: selectedMonth }
+                }),
+                supabase.functions.invoke('dashboard-manager-daily', {
+                    body: { userId: user?.id, date: mayUseDaily(selectedMonth) ? undefined : `${selectedMonth}-01` }
+                })
             ]);
 
             if (monthlyResponse.error) throw monthlyResponse.error;
@@ -152,7 +160,7 @@ export default function ManagerExportPage() {
             const monthlyData = monthlyResponse.data;
             const dailyData = dailyResponse.data;
 
-            // Build daily data maps untuk quick lookup
+            // Build daily data maps
             const dailyAreaMap = new Map<string, DailyArea>();
             const dailySatorMap = new Map<string, { total_input: number; total_closed: number; total_pending: number; total_rejected: number }>();
             const dailyPromotorMap = new Map<string, { total_input: number; total_closed: number; total_pending: number; total_rejected: number }>();
@@ -179,7 +187,7 @@ export default function ManagerExportPage() {
                 });
             }
 
-            // Merge daily data ke monthly data - AREAS
+            // Sync Monthly with Daily
             const areasWithDaily = (monthlyData?.areas || []).map((area: Member) => {
                 const dailyArea = dailyAreaMap.get(area.user_id);
                 return {
@@ -191,7 +199,6 @@ export default function ManagerExportPage() {
                 };
             });
 
-            // Merge daily data ke monthly data - SATORS
             const satorsWithDaily = (monthlyData?.sators || []).map((sator: Member) => {
                 const dailySator = dailySatorMap.get(sator.user_id);
                 return {
@@ -203,7 +210,6 @@ export default function ManagerExportPage() {
                 };
             });
 
-            // Merge daily data ke monthly data - PROMOTORS
             const promotorsWithDaily = (monthlyData?.promotors || []).map((promotor: Member) => {
                 const dailyPromotor = dailyPromotorMap.get(promotor.user_id);
                 return {
@@ -219,13 +225,10 @@ export default function ManagerExportPage() {
             setSators(satorsWithDaily);
             setPromotors(promotorsWithDaily);
 
-            // Fetch SPC data (monthly + daily) - Manager always has access to SPC
-            const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
-            // Fetch SPC monthly and daily in parallel
+            // Fetch SPC Data
             const [spcMonthlyResponse, spcDailyResponse] = await Promise.all([
                 supabase.functions.invoke('dashboard-spc-monthly', {
-                    body: { userId: user?.id, month: monthStr }
+                    body: { userId: user?.id, month: selectedMonth }
                 }),
                 supabase.functions.invoke('dashboard-spc-daily', {
                     body: { userId: user?.id }
@@ -233,51 +236,37 @@ export default function ManagerExportPage() {
             ]);
 
             const spcData = spcMonthlyResponse.data;
-            const spcDailyData = spcDailyResponse.data;
+            const spcDaily = spcDailyResponse.data;
 
-            // Build SPC daily map untuk quick lookup (include promotors)
-            const spcDailyMap = new Map<string, { total_input: number; total_closed: number; total_pending: number; total_rejected: number; promotors?: any[] }>();
-            if (spcDailyData?.success && spcDailyData?.stores) {
-                spcDailyData.stores.forEach((store: any) => {
-                    spcDailyMap.set(store.store_id, {
-                        total_input: store.total_input || 0,
-                        total_closed: store.total_closed || 0,
-                        total_pending: store.total_pending || 0,
-                        total_rejected: store.total_rejected || 0,
-                        promotors: store.promotors || []
-                    });
-                });
+            const spcDailyMap = new Map<string, any>();
+            if (spcDaily?.success && spcDaily?.stores) {
+                spcDaily.stores.forEach((s: any) => spcDailyMap.set(s.store_id, s));
             }
 
             if (!spcMonthlyResponse.error && spcData?.success) {
                 const stores = spcData.stores || [];
-
-                // Langsung pakai promotors dari Edge Function yang sudah lengkap
                 const storesWithDaily = stores.map((store: any) => {
-                    const dailyStore = spcDailyMap.get(store.store_id);
-
-                    // Merge daily data ke promotors dari Edge Function
-                    const promotorsWithDaily = (store.promotors || []).map((p: any) => ({
+                    const daily = spcDailyMap.get(store.store_id);
+                    const spcProms = (store.promotors || []).map((p: any) => ({
                         ...p,
-                        daily_input: dailyStore?.promotors?.find((dp: any) => dp.user_id === p.user_id)?.total_input || 0,
-                        daily_closed: dailyStore?.promotors?.find((dp: any) => dp.user_id === p.user_id)?.total_closed || 0,
-                        daily_pending: dailyStore?.promotors?.find((dp: any) => dp.user_id === p.user_id)?.total_pending || 0,
-                        daily_rejected: dailyStore?.promotors?.find((dp: any) => dp.user_id === p.user_id)?.total_rejected || 0
+                        daily_input: daily?.promotors?.find((dp: any) => dp.user_id === p.user_id)?.total_input || 0,
+                        daily_closed: daily?.promotors?.find((dp: any) => dp.user_id === p.user_id)?.total_closed || 0,
+                        daily_pending: daily?.promotors?.find((dp: any) => dp.user_id === p.user_id)?.total_pending || 0,
+                        daily_rejected: daily?.promotors?.find((dp: any) => dp.user_id === p.user_id)?.total_rejected || 0
                     }));
-
                     return {
                         ...store,
-                        daily_input: dailyStore?.total_input || 0,
-                        daily_closed: dailyStore?.total_closed || 0,
-                        daily_pending: dailyStore?.total_pending || 0,
-                        daily_rejected: dailyStore?.total_rejected || 0,
-                        promotors: promotorsWithDaily
+                        daily_input: daily?.total_input || 0,
+                        daily_closed: daily?.total_closed || 0,
+                        daily_pending: daily?.total_pending || 0,
+                        daily_rejected: daily?.total_rejected || 0,
+                        promotors: spcProms
                     };
                 });
-
                 setSpcStores(storesWithDaily);
-                setSpcTotals(spcData.totals || { input: 0, closed: 0, pending: 0, rejected: 0, target: 0 });
+                setSpcTotals(spcData.totals || { input: 0, closed: 0, target: 0, pending: 0, rejected: 0 });
             }
+
         } catch (err) {
             console.error(err);
             setError('Gagal memuat data');
@@ -286,218 +275,148 @@ export default function ManagerExportPage() {
         }
     };
 
-    const handleExport = async () => {
+    const mayUseDaily = (m: string) => {
+        const d = new Date();
+        const cm = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        return m === cm;
+    }
+
+    const handleExport = async (forcedFormat: 'excel' | 'png', incPerf: boolean, incSpc: boolean, imgType?: 'area' | 'promotor' | 'spc') => {
         setExporting(true);
         try {
-            const dateStr = new Date().toISOString().slice(0, 10);
-
-            if (exportFormat === 'excel') {
+            if (forcedFormat === 'excel') {
                 const wb = XLSX.utils.book_new();
 
-                if (includePerformance) {
-                    // Format: daily/total/target (contoh: 3/10/50)
-                    const areaData = areas.map(m => {
-                        const pct = m.target > 0 ? Math.round((m.total_input / m.target) * 100) : 0;
+                // 1. AREA SUMMARY
+                if (incPerf) {
+                    const areaSheet = areas.map(a => {
+                        const pct = a.target > 0 ? Math.round((a.total_input / a.target) * 100) : 0;
                         return {
-                            AREA: m.name,
-                            'INPUT (H/T/TGT)': `${m.daily_input || 0}/${m.total_input}/${m.target}`,
-                            'CAPAIAN_%': pct,
-                            'CLOSING (H/T)': `${m.daily_closed || 0}/${m.total_closed}`,
-                            'PENDING (H/T)': `${m.daily_pending || 0}/${m.total_pending}`,
-                            'REJECT (H/T)': `${m.daily_rejected || 0}/${m.total_rejected}`,
-                            STATUS: isUnderperform(m) ? 'UNDERPERFORM' : 'OK'
+                            AREA: a.name,
+                            MANAGER: a.role,
+                            TARGET: a.target,
+                            INPUT: a.total_input,
+                            CAPAIAN: `${pct}%`,
+                            CLOSING: a.total_closed,
+                            PENDING: a.total_pending,
+                            REJECT: a.total_rejected,
                         };
                     });
-                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(areaData), 'AREA_SUMMARY');
+                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(areaSheet), 'AREA_SUMMARY');
 
-                    const satorData = sators.map(m => {
-                        const pct = m.target > 0 ? Math.round((m.total_input / m.target) * 100) : 0;
-                        return {
-                            AREA: m.area,
-                            SATOR: m.name,
-                            'INPUT (H/T/TGT)': `${m.daily_input || 0}/${m.total_input}/${m.target}`,
-                            'CAPAIAN_%': pct,
-                            'CLOSING (H/T)': `${m.daily_closed || 0}/${m.total_closed}`,
-                            'PENDING (H/T)': `${m.daily_pending || 0}/${m.total_pending}`,
-                            'REJECT (H/T)': `${m.daily_rejected || 0}/${m.total_rejected}`,
-                            STATUS: isUnderperform(m) ? 'UNDERPERFORM' : 'OK'
-                        };
-                    });
-                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(satorData), 'SATOR_DETAIL');
-
-                    const promotorData = promotors.map(m => {
-                        const pct = m.target > 0 ? Math.round((m.total_input / m.target) * 100) : 0;
-                        return {
-                            AREA: m.area,
-                            SATOR: m.sator_name,
-                            PROMOTOR: m.name,
-                            'INPUT (H/T/TGT)': `${m.daily_input || 0}/${m.total_input}/${m.target}`,
-                            'CAPAIAN_%': pct,
-                            'CLOSING (H/T)': `${m.daily_closed || 0}/${m.total_closed}`,
-                            'PENDING (H/T)': `${m.daily_pending || 0}/${m.total_pending}`,
-                            'REJECT (H/T)': `${m.daily_rejected || 0}/${m.total_rejected}`,
-                            STATUS: isUnderperform(m) ? 'UNDERPERFORM' : 'OK'
-                        };
-                    });
-                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(promotorData), 'PROMOTOR_DETAIL');
-                }
-
-                if (includeUnderperform) {
-                    // Format underperform dengan daily/total/target
-                    const underData = [
-                        ...areas.filter(isUnderperform).map(m => ({
-                            Level: 'AREA',
-                            Nama: m.name,
-                            'INPUT (H/T/TGT)': `${m.daily_input || 0}/${m.total_input}/${m.target}`,
-                            'CLOSING (H/T)': `${m.daily_closed || 0}/${m.total_closed}`,
-                            'PENDING (H/T)': `${m.daily_pending || 0}/${m.total_pending}`,
-                            'REJECT (H/T)': `${m.daily_rejected || 0}/${m.total_rejected}`,
-                            GAP: m.target - m.total_input
-                        })),
-                        ...sators.filter(isUnderperform).map(m => ({
-                            Level: 'SATOR',
-                            Nama: m.name,
-                            Area: m.area,
-                            'INPUT (H/T/TGT)': `${m.daily_input || 0}/${m.total_input}/${m.target}`,
-                            'CLOSING (H/T)': `${m.daily_closed || 0}/${m.total_closed}`,
-                            'PENDING (H/T)': `${m.daily_pending || 0}/${m.total_pending}`,
-                            'REJECT (H/T)': `${m.daily_rejected || 0}/${m.total_rejected}`,
-                            GAP: m.target - m.total_input
-                        })),
-                        ...promotors.filter(isUnderperform).map(m => ({
-                            Level: 'PROMOTOR',
-                            Nama: m.name,
-                            Area: m.area,
-                            'INPUT (H/T/TGT)': `${m.daily_input || 0}/${m.total_input}/${m.target}`,
-                            'CLOSING (H/T)': `${m.daily_closed || 0}/${m.total_closed}`,
-                            'PENDING (H/T)': `${m.daily_pending || 0}/${m.total_pending}`,
-                            'REJECT (H/T)': `${m.daily_rejected || 0}/${m.total_rejected}`,
-                            GAP: m.target - m.total_input
-                        })),
-                    ];
-                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(underData), 'UNDERPERFORM');
-                }
-
-
-
-                // SPC Data - Format: daily/total/target
-                if (includeSpcData && spcStores.length > 0) {
-                    const spcExportData = spcStores.map(s => {
+                    // 2. SATOR DETAIL
+                    const satorSheet = sators.map(s => {
                         const pct = s.target > 0 ? Math.round((s.total_input / s.target) * 100) : 0;
                         return {
-                            TOKO: s.store_name,
-                            'INPUT (H/T/TGT)': `${s.daily_input || 0}/${s.total_input}/${s.target}`,
-                            'CAPAIAN_%': pct,
-                            'CLOSING (H/T)': `${s.daily_closed || 0}/${s.total_closed}`,
-                            'PENDING (H/T)': `${s.daily_pending || 0}/${s.total_pending}`,
-                            'REJECT (H/T)': `${s.daily_rejected || 0}/${s.total_rejected}`,
-                            STATUS: isUnderperform(s) ? 'UNDERPERFORM' : 'OK',
-                            'JUMLAH_PROMOTOR': s.promotors?.length || 0
+                            AREA: s.area,
+                            SATOR: s.name,
+                            TARGET: s.target,
+                            INPUT: s.total_input,
+                            CAPAIAN: `${pct}%`,
+                            CLOSING: s.total_closed,
+                            PENDING: s.total_pending,
+                            REJECT: s.total_rejected,
+                            STATUS: isUnderperform(s) ? 'UNDERPERFORM' : 'ON TRACK'
                         };
                     });
-                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(spcExportData), 'SPC_PERFORMANCE');
+                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(satorSheet), 'SATOR_DETAIL');
 
-                    const spcPromotorDetail: any[] = [];
-                    spcStores.forEach(store => {
-                        if (store.promotors && store.promotors.length > 0) {
-                            store.promotors.forEach(promotor => {
-                                const promotorPct = promotor.target && promotor.target > 0
-                                    ? Math.round((promotor.total_input / promotor.target) * 100)
-                                    : 0;
-                                spcPromotorDetail.push({
-                                    TOKO: store.store_name,
-                                    PROMOTOR: promotor.name,
-                                    TARGET: promotor.target || 0,
-                                    'INPUT (H/T)': `${promotor.daily_input || 0}/${promotor.total_input}`,
-                                    'CAPAIAN_%': promotorPct,
-                                    'CLOSING (H/T)': `${promotor.daily_closed || 0}/${promotor.total_closed}`,
-                                    'PENDING (H/T)': `${promotor.daily_pending || 0}/${promotor.total_pending}`,
-                                    'REJECT (H/T)': `${promotor.daily_rejected || 0}/${promotor.total_rejected}`
-                                });
-                            });
-                        } else {
-                            spcPromotorDetail.push({
-                                TOKO: store.store_name,
-                                PROMOTOR: '(Tidak ada promotor)',
-                                TARGET: 0,
-                                'INPUT (H/T)': '0/0',
-                                'CAPAIAN_%': 0,
-                                'CLOSING (H/T)': '0/0',
-                                'PENDING (H/T)': '0/0',
-                                'REJECT (H/T)': '0/0'
-                            });
-                        }
+                    // 3. PROMOTOR LIST
+                    const promotorSheet = promotors.map(p => {
+                        const pct = p.target > 0 ? Math.round((p.total_input / p.target) * 100) : 0;
+                        return {
+                            AREA: p.area,
+                            SATOR: p.sator_name,
+                            PROMOTOR: p.name,
+                            TARGET: p.target,
+                            INPUT: p.total_input,
+                            CAPAIAN: `${pct}%`,
+                            CLOSING: p.total_closed,
+                            PENDING: p.total_pending,
+                            REJECT: p.total_rejected
+                        };
                     });
-                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(spcPromotorDetail), 'SPC_PROMOTOR_DETAIL');
-
-
-                    const spcSummary = [
-                        { Label: 'HEADER', Value: 'SPC GRUP' },
-                        { Label: 'AREA', Value: 'TIMOR-SUMBA' },
-                        { Label: 'MANAGER AREA', Value: user?.name || 'N/A' },
-                        { Label: 'TANGGAL', Value: new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }) },
-                        { Label: '', Value: '' },
-                        { Label: 'PERIODE', Value: periodLabel },
-                        { Label: 'TIME GONE', Value: `${timeGonePercent}%` },
-                        { Label: 'TOTAL TOKO SPC', Value: spcStores.length },
-                        { Label: 'TOTAL TARGET', Value: spcTotals.target },
-                        { Label: 'TOTAL INPUT', Value: spcTotals.input },
-                        { Label: 'TOTAL CLOSING', Value: spcTotals.closed },
-                        { Label: 'CAPAIAN', Value: spcTotals.target > 0 ? `${Math.round((spcTotals.input / spcTotals.target) * 100)}%` : '-' },
-                    ];
-                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(spcSummary), 'SPC_SUMMARY');
+                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(promotorSheet), 'PROMOTOR_LIST');
                 }
 
-                XLSX.writeFile(wb, `Laporan_Manager_${dateStr}.xlsx`);
+                // 4. SPC DATA
+                if (incSpc && spcStores.length > 0) {
+                    const spcSheet = spcStores.map(s => ({
+                        TOKO: s.store_name,
+                        TARGET: s.target,
+                        INPUT: s.total_input,
+                        CLOSING: s.total_closed,
+                        PENDING: s.total_pending,
+                        REJECT: s.total_rejected,
+                        JUMLAH_PROMOTOR: s.promotors?.length || 0
+                    }));
+                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(spcSheet), 'SPC_STORES');
+                }
+
+                XLSX.writeFile(wb, `Laporan_Manager_${periodLabel.replace(/ /g, '_')}.xlsx`);
             }
 
-            if (exportFormat === 'png') {
+            if (forcedFormat === 'png') {
                 const downloadImage = async (ref: React.RefObject<HTMLDivElement | null>, filename: string) => {
                     if (!ref.current) return;
-                    const canvas = await html2canvas(ref.current, {
-                        backgroundColor: '#ffffff',
-                        scale: 2,
-                        logging: false,
-                        useCORS: true,
-                        allowTaint: true,
-                        removeContainer: true
-                    });
-                    const link = document.createElement('a');
-                    link.download = filename;
-                    link.href = canvas.toDataURL('image/png');
-                    link.click();
+                    try {
+                        const canvas = await html2canvas(ref.current, {
+                            backgroundColor: '#ffffff',
+                            scale: 2,
+                            logging: false,
+                            useCORS: true,
+                            allowTaint: true
+                        });
+                        const link = document.createElement('a');
+                        link.download = filename;
+                        link.href = canvas.toDataURL('image/png');
+                        link.click();
+                        await new Promise(resolve => setTimeout(resolve, 800));
+                    } catch (e) {
+                        console.error("Error creating image:", e);
+                    }
                 };
 
-                // Download Tim Performance (Area + Sator)
-                if ((includePerformance || includeUnderperform) && reportRef.current) {
-                    await downloadImage(reportRef, `Laporan_Tim_Manager_${dateStr}.png`);
-                }
-
-                // Download SPC if selected
-                if (includeSpcData && spcStores.length > 0 && spcTableRef.current) {
-                    // Small delay between downloads
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    await downloadImage(spcTableRef, `Laporan_SPC_Manager_${dateStr}.png`);
+                if (imgType === 'area') {
+                    if (areaTableRef.current) await downloadImage(areaTableRef, `MGR_Area_Summary_${selectedMonth}.png`);
+                    if (satorTableRef.current) await downloadImage(satorTableRef, `MGR_Sator_Detail_${selectedMonth}.png`);
+                } else if (imgType === 'promotor') {
+                    if (promotorTableRef.current) await downloadImage(promotorTableRef, `MGR_Promotor_List_${selectedMonth}.png`);
+                } else if (imgType === 'spc') {
+                    if (spcTableRef.current) await downloadImage(spcTableRef, `MGR_SPC_Data_${selectedMonth}.png`);
                 }
             }
-        } catch (err) {
-            console.error(err);
-            alert('Gagal export');
+        } catch (error) {
+            console.error(error);
+            setError('Gagal export data');
         } finally {
             setExporting(false);
         }
     };
 
-    if (loading) return <DashboardLayout><Loading message="Memuat data..." /></DashboardLayout>;
-    if (error) return <DashboardLayout><Alert type="error" message={error} /></DashboardLayout>;
+    if (loading) return (
+        <DashboardLayout allowedRoles={['manager']}>
+            <div className="flex flex-col items-center justify-center min-h-[60vh]">
+                <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin mb-4" />
+                <div className="text-muted-foreground font-medium animate-pulse">Memuat data manager...</div>
+            </div>
+        </DashboardLayout>
+    );
 
-    const spcUnderperformCount = spcStores.filter(isUnderperform).length;
+    if (error) return (
+        <DashboardLayout allowedRoles={['manager']}>
+            <div className="p-8 text-center text-red-500 font-bold bg-red-50 rounded-xl m-8 border border-red-100">
+                {error}
+            </div>
+        </DashboardLayout>
+    );
+
+    const hasSpcAccess = true; // Manager always has access
 
     return (
         <DashboardLayout allowedRoles={['manager']}>
             <div className="min-h-screen bg-background pb-32">
-
-                {/* 1. Header Banner Premium */}
+                {/* 1. Header Banner */}
                 <div className="relative w-full bg-primary pb-12 pt-6 px-5 rounded-b-[2.5rem] shadow-xl overflow-hidden">
                     <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl" />
                     <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 bg-blue-400 opacity-10 rounded-full blur-2xl" />
@@ -521,617 +440,354 @@ export default function ManagerExportPage() {
                 {/* 2. Content Container */}
                 <div className="px-5 -mt-6 relative z-20 space-y-6">
 
-                    {/* A. SUMBER DATA (Selection Cards) */}
-                    <div className="space-y-3">
-                        <h3 className="text-sm font-black text-muted-foreground uppercase tracking-widest pl-1">1. Pilih Sumber Data</h3>
-                        <div className="grid grid-cols-1 gap-2">
-                            {[
-                                { id: 'perf', label: 'Performance', sub: 'Ringkasan Area & Sator', state: includePerformance, set: setIncludePerformance, icon: '📊' },
-                                { id: 'under', label: 'Underperform', sub: 'Daftar Unit di bawah Target', state: includeUnderperform, set: setIncludeUnderperform, icon: '📉' },
-                                { id: 'spc', label: 'SPC - Data Toko', sub: `${spcStores.length} Toko Grup SPC`, state: includeSpcData, set: setIncludeSpcData, icon: '🏪', accent: 'purple' },
-                            ].map((item) => (
-                                <button
-                                    key={item.id}
-                                    onClick={() => item.set(!item.state)}
-                                    className={cn(
-                                        "flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left",
-                                        item.state
-                                            ? item.accent === 'purple' ? "border-purple-500 bg-purple-50" : "border-primary bg-primary/5"
-                                            : "border-border bg-card hover:border-muted-foreground/30"
-                                    )}
-                                >
-                                    <div className={cn(
-                                        "w-12 h-12 rounded-xl flex items-center justify-center text-2xl shadow-sm",
-                                        item.state ? "bg-white" : "bg-muted"
-                                    )}>
-                                        {item.icon}
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className={cn("font-bold text-base", item.state ? "text-foreground" : "text-muted-foreground")}>{item.label}</div>
-                                        <div className="text-[11px] text-muted-foreground font-medium">{item.sub}</div>
-                                    </div>
-                                    <div className={cn(
-                                        "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
-                                        item.state ? item.accent === 'purple' ? "bg-purple-500 border-purple-500" : "bg-primary border-primary" : "border-muted"
-                                    )}>
-                                        {item.state && <Check className="w-3 h-3 text-white stroke-[4]" />}
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* B. FORMAT FILE (Selector) */}
-                    <div className="space-y-3">
-                        <h3 className="text-sm font-black text-muted-foreground uppercase tracking-widest pl-1">2. Pilih Format</h3>
-                        <div className="grid grid-cols-2 gap-3">
-                            {[
-                                { id: 'excel', label: 'EXCEL (.xlsx)', icon: FileSpreadsheet, sub: 'Data Terstruktur' },
-                                { id: 'png', label: 'IMAGE (.png)', icon: Image, sub: 'Preview Visual' },
-                            ].map((fmt) => (
-                                <button
-                                    key={fmt.id}
-                                    onClick={() => setExportFormat(fmt.id as 'excel' | 'png')}
-                                    className={cn(
-                                        "flex flex-col items-center p-5 rounded-2xl border-2 transition-all",
-                                        exportFormat === fmt.id ? "border-primary bg-primary/5 ring-4 ring-primary/10" : "border-border bg-card hover:bg-muted"
-                                    )}
-                                >
-                                    <fmt.icon className={cn("w-10 h-10 mb-3", exportFormat === fmt.id ? "text-primary" : "text-muted-foreground")} />
-                                    <span className={cn("text-xs font-black", exportFormat === fmt.id ? "text-primary" : "text-muted-foreground")}>{fmt.label}</span>
-                                    <span className="text-[9px] text-muted-foreground font-bold mt-1 uppercase">{fmt.sub}</span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* C. PREVIEW & SUMMARY */}
-                    <div className="space-y-3">
-                        <div className="flex items-center justify-between pl-1">
-                            <h3 className="text-sm font-black text-muted-foreground uppercase tracking-widest">3. Ringkasan & Preview</h3>
+                    {/* A. MONTH SELECTOR & STATS */}
+                    <div className="bg-card rounded-2xl border border-border p-5 shadow-sm space-y-4 bg-white">
+                        {/* Month Selector */}
+                        <div className="flex items-center justify-between bg-muted/30 p-2 rounded-xl border border-border/50">
                             <button
-                                onClick={() => setShowPreview(!showPreview)}
-                                className="text-[10px] font-bold text-primary flex items-center gap-1 hover:underline outline-none"
+                                onClick={() => {
+                                    const d = new Date(`${selectedMonth}-01`);
+                                    d.setMonth(d.getMonth() - 1);
+                                    setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+                                }}
+                                className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white hover:shadow-sm transition-all text-muted-foreground"
                             >
-                                <Eye className="w-3 h-3" /> {showPreview ? 'SEMBUNYIKAN' : 'LIHAT PREVIEW'}
+                                <span className="text-xl">◀</span>
+                            </button>
+
+                            <div className="text-center">
+                                <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">PERIODE LAPORAN</div>
+                                <div className="text-lg font-black text-primary">{periodLabel}</div>
+                            </div>
+
+                            <button
+                                onClick={() => {
+                                    if (isCurrentMonth) return;
+                                    const d = new Date(`${selectedMonth}-01`);
+                                    d.setMonth(d.getMonth() + 1);
+                                    setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+                                }}
+                                disabled={isCurrentMonth}
+                                className={cn(
+                                    "w-10 h-10 flex items-center justify-center rounded-lg transition-all",
+                                    isCurrentMonth ? "opacity-30 cursor-not-allowed" : "hover:bg-white hover:shadow-sm text-muted-foreground"
+                                )}
+                            >
+                                <span className="text-xl">▶</span>
                             </button>
                         </div>
 
-                        <div ref={previewRef} className="bg-card rounded-2xl border border-border overflow-hidden shadow-inner bg-white">
-                            {/* Summary Totals */}
-                            <div className="grid grid-cols-3 gap-0 border-b border-border/50">
-                                <div className="text-center py-5">
-                                    <div className="text-xl font-black text-foreground">{areas.length}</div>
-                                    <div className="text-[9px] font-bold text-muted-foreground uppercase">Area</div>
-                                </div>
-                                <div className="text-center py-5 border-x border-border/50">
-                                    <div className="text-xl font-black text-foreground">{sators.length}</div>
-                                    <div className="text-[9px] font-bold text-muted-foreground uppercase">Sator</div>
-                                </div>
-                                <div className="text-center py-5">
-                                    <div className="text-xl font-black text-foreground">{promotors.length}</div>
-                                    <div className="text-[9px] font-bold text-muted-foreground uppercase">Promotor</div>
-                                </div>
+                        {/* Quick Stats Grid */}
+                        <div className="grid grid-cols-4 gap-2">
+                            <div className="bg-blue-50/50 p-2 rounded-xl border border-blue-100/50 text-center">
+                                <div className="text-[9px] font-bold text-blue-600/70 uppercase">Total SPV</div>
+                                <div className="text-lg font-black text-blue-700">{areas.length}</div>
                             </div>
+                            <div className="bg-indigo-50/50 p-2 rounded-xl border border-indigo-100/50 text-center">
+                                <div className="text-[9px] font-bold text-indigo-600/70 uppercase">Sator</div>
+                                <div className="text-lg font-black text-indigo-700">{sators.length}</div>
+                            </div>
+                            <div className="bg-violet-50/50 p-2 rounded-xl border border-violet-100/50 text-center">
+                                <div className="text-[9px] font-bold text-violet-600/70 uppercase">Promotor</div>
+                                <div className="text-lg font-black text-violet-700">{promotors.length}</div>
+                            </div>
+                            <div className="bg-emerald-50/50 p-2 rounded-xl border border-emerald-100/50 text-center">
+                                <div className="text-[9px] font-bold text-emerald-600/70 uppercase">Input</div>
+                                <div className="text-lg font-black text-emerald-700">{totalGlobalInput}</div>
+                            </div>
+                        </div>
+                    </div>
 
-                            {/* Detailed Live Preview Table - Dynamic based on selection */}
-                            {showPreview && (
-                                <div className="animate-in fade-in slide-in-from-top-2 duration-300 divide-y divide-border/50">
-                                    {/* Data Performance (Area) Preview - Format: H/T/TGT */}
-                                    {includePerformance && (
-                                        <div className="bg-white/50">
-                                            <div className="bg-primary/5 px-4 py-2 flex justify-between items-center border-b border-primary/10">
-                                                <span className="text-[10px] font-black text-primary uppercase tracking-widest flex items-center gap-1.5"><div className="w-1 h-3 bg-primary rounded-full" /> Performance Area</span>
-                                                <span className="text-[9px] font-bold text-muted-foreground uppercase">H/T/TGT</span>
-                                            </div>
-                                            <div className="overflow-x-auto">
-                                                <table className="w-full text-[10px]">
-                                                    <thead className="bg-muted/30">
-                                                        <tr>
-                                                            <th className="px-3 py-1.5 text-left font-bold text-muted-foreground">AREA</th>
-                                                            <th className="px-2 py-1.5 text-center font-bold text-muted-foreground">INPUT</th>
-                                                            <th className="px-2 py-1.5 text-center font-bold text-muted-foreground">CLO</th>
-                                                            <th className="px-2 py-1.5 text-center font-bold text-muted-foreground">PND</th>
-                                                            <th className="px-2 py-1.5 text-center font-bold text-muted-foreground">REJ</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-border/30">
-                                                        {areas.slice(0, 3).map((a, i) => (
-                                                            <tr key={i} className="hover:bg-muted/10">
-                                                                <td className="px-3 py-2 font-bold text-foreground">{a.name}</td>
-                                                                <td className="px-2 py-2 text-center font-mono text-primary font-bold">{a.daily_input || 0}/{a.total_input}/{a.target}</td>
-                                                                <td className="px-2 py-2 text-center font-mono text-emerald-600">{a.daily_closed || 0}/{a.total_closed}</td>
-                                                                <td className="px-2 py-2 text-center font-mono text-amber-600">{a.daily_pending || 0}/{a.total_pending}</td>
-                                                                <td className="px-2 py-2 text-center font-mono text-red-500">{a.daily_rejected || 0}/{a.total_rejected}</td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    )}
+                    {/* B. ACTION BUTTONS */}
+                    <div className="space-y-3 pb-32">
+                        <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest pl-2">Format Export</h3>
 
-                                    {/* Underperform Preview - Format: H/T/TGT */}
-                                    {includeUnderperform && (
-                                        <div className="bg-red-50/30">
-                                            <div className="bg-red-500/10 px-4 py-2 flex justify-between items-center border-b border-red-200/50">
-                                                <span className="text-[10px] font-black text-red-600 uppercase tracking-widest flex items-center gap-1.5"><div className="w-1 h-3 bg-red-500 rounded-full" /> Underperform</span>
-                                                <span className="text-[9px] font-bold text-red-500 uppercase">H/T/TGT</span>
-                                            </div>
-                                            <div className="overflow-x-auto">
-                                                <table className="w-full text-[10px]">
-                                                    <thead className="bg-red-100/50">
-                                                        <tr>
-                                                            <th className="px-3 py-1.5 text-left font-bold text-red-700">SATOR</th>
-                                                            <th className="px-2 py-1.5 text-center font-bold text-red-700">INPUT</th>
-                                                            <th className="px-2 py-1.5 text-center font-bold text-red-700">GAP</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-red-100">
-                                                        {sators.filter(isUnderperform).slice(0, 3).map((s, i) => {
-                                                            const gap = s.target - s.total_input;
-                                                            return (
-                                                                <tr key={i} className="hover:bg-red-500/5">
-                                                                    <td className="px-3 py-2 font-bold text-red-900">{s.name}</td>
-                                                                    <td className="px-2 py-2 text-center font-mono text-red-600 font-bold">{s.daily_input || 0}/{s.total_input}/{s.target}</td>
-                                                                    <td className="px-2 py-2 text-center font-black text-red-500">{gap}</td>
-                                                                </tr>
-                                                            );
-                                                        })}
-                                                        {sators.filter(isUnderperform).length === 0 && (
-                                                            <tr><td colSpan={3} className="px-4 py-4 text-center text-[9px] font-bold text-emerald-600">SEMUA UNIT ON-TRACK!</td></tr>
-                                                        )}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    )}
-
-
-
-                                    {/* SPC Data Preview - dengan Header Standar + Detail Promotor */}
-                                    {includeSpcData && (
-                                        <div className="bg-purple-50/30">
-                                            {/* Header SPC */}
-                                            <div className="bg-purple-700 px-4 py-3 text-white">
-                                                <div className="text-[11px] font-black uppercase tracking-widest mb-1">SPC GRUP</div>
-                                                <div className="text-[9px] space-y-0.5">
-                                                    <div>AREA: TIMOR-SUMBA</div>
-                                                    <div>MANAGER: {user?.name || 'N/A'}</div>
-                                                    <div>TANGGAL: {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
-                                                </div>
-                                            </div>
-
-                                            {/* Tabel Toko */}
-                                            <div className="bg-purple-500/10 px-4 py-2 border-b border-purple-200/50">
-                                                <span className="text-[10px] font-black text-purple-700 uppercase tracking-widest">Performance Toko ({spcStores.length})</span>
-                                            </div>
-                                            <div className="overflow-x-auto">
-                                                <table className="w-full text-[10px]">
-                                                    <thead className="bg-purple-100/50">
-                                                        <tr>
-                                                            <th className="px-3 py-1.5 text-left font-bold text-purple-700">TOKO</th>
-                                                            <th className="px-2 py-1.5 text-center font-bold text-purple-700">TGT</th>
-                                                            <th className="px-2 py-1.5 text-center font-bold text-purple-700">INPUT</th>
-                                                            <th className="px-2 py-1.5 text-center font-bold text-purple-700">%</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-purple-100">
-                                                        {spcStores.slice(0, 3).map((s, i) => {
-                                                            const pct = s.target > 0 ? Math.round((s.total_input / s.target) * 100) : 0;
-                                                            return (
-                                                                <tr key={i} className="hover:bg-purple-500/5">
-                                                                    <td className="px-3 py-2 font-bold text-purple-900">{s.store_name}</td>
-                                                                    <td className="px-2 py-2 text-center font-mono text-purple-600">{s.target}</td>
-                                                                    <td className="px-2 py-2 text-center font-mono text-purple-600 font-bold">{s.daily_input || 0}/{s.total_input}</td>
-                                                                    <td className={cn("px-2 py-2 text-center font-bold", pct >= timeGonePercent ? "text-emerald-600" : "text-red-500")}>{pct}%</td>
-                                                                </tr>
-                                                            );
-                                                        })}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-
-                                            {/* Detail Promotor */}
-                                            <div className="bg-purple-400/10 px-4 py-2 border-b border-purple-200/50 border-t">
-                                                <span className="text-[10px] font-black text-purple-700 uppercase tracking-widest">Detail Promotor (Sample)</span>
-                                            </div>
-                                            <div className="overflow-x-auto">
-                                                <table className="w-full text-[9px]">
-                                                    <thead className="bg-purple-200/50">
-                                                        <tr>
-                                                            <th className="px-2 py-1 text-left font-bold text-purple-700">TOKO</th>
-                                                            <th className="px-2 py-1 text-left font-bold text-purple-700">PROMOTOR</th>
-                                                            <th className="px-2 py-1 text-center font-bold text-purple-700">TGT</th>
-                                                            <th className="px-2 py-1 text-center font-bold text-purple-700">INPUT</th>
-                                                            <th className="px-2 py-1 text-center font-bold text-purple-700">%</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-purple-100">
-                                                        {spcStores.slice(0, 2).map((store, storeIdx) => {
-                                                            if (!store.promotors || store.promotors.length === 0) {
-                                                                return (
-                                                                    <tr key={`st-${storeIdx}`} className="bg-yellow-50">
-                                                                        <td className="px-2 py-1.5 text-purple-600">{store.store_name}</td>
-                                                                        <td colSpan={4} className="px-2 py-1.5 text-center italic text-gray-500">(Tidak ada promotor)</td>
-                                                                    </tr>
-                                                                );
-                                                            }
-                                                            return store.promotors.slice(0, 2).map((promotor, promIdx) => {
-                                                                const promPct = promotor.target && promotor.target > 0 ? Math.round((promotor.total_input / promotor.target) * 100) : 0;
-                                                                return (
-                                                                    <tr key={`${storeIdx}-${promIdx}`} className="hover:bg-purple-500/5">
-                                                                        <td className="px-2 py-1.5 text-purple-600 text-[8px]">{promIdx === 0 ? store.store_name : ''}</td>
-                                                                        <td className="px-2 py-1.5 font-bold text-purple-900">{promotor.name}</td>
-                                                                        <td className="px-2 py-1.5 text-center font-mono text-purple-600">{promotor.target || 0}</td>
-                                                                        <td className="px-2 py-1.5 text-center font-mono text-purple-700 font-bold">{promotor.daily_input || 0}/{promotor.total_input}</td>
-                                                                        <td className={cn("px-2 py-1.5 text-center font-bold", promPct >= timeGonePercent ? "text-emerald-600" : "text-red-500")}>{promPct}%</td>
-                                                                    </tr>
-                                                                );
-                                                            });
-                                                        })}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                            <div className="px-4 py-2 bg-purple-50 border-t border-purple-200/50">
-                                                <p className="text-[8px] text-purple-600 italic">Preview terbatas. Download untuk data lengkap.</p>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Empty Selection Handler */}
-                                    {!includePerformance && !includeUnderperform && !includeSpcData && (
-                                        <div className="p-8 text-center bg-muted/10">
-                                            <div className="text-[10px] font-bold text-muted-foreground italic uppercase flex flex-col items-center gap-2">
-                                                <div className="w-8 h-8 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center text-lg">?</div>
-                                                Pilih sumber data untuk melihat preview
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <div className="p-3 bg-white/50 text-center border-t border-border/50">
-                                        <p className="text-[9px] font-bold text-muted-foreground leading-tight italic">
-                                            Preview menunjukkan sampel data terbatas agar tetap ringan.
-                                        </p>
+                        {/* 1. EXCEL FULL */}
+                        <button
+                            disabled={loading || exporting}
+                            onClick={async () => {
+                                setExportFormat('excel');
+                                setIncludePerformance(true);
+                                setIncludeUnderperform(true);
+                                setIncludeSpcData(true);
+                                handleExport('excel', true, true);
+                            }}
+                            className="w-full relative overflow-hidden group bg-[#107c41] hover:bg-[#0c6b37] text-white p-4 rounded-2xl shadow-lg shadow-emerald-900/10 transition-all border-b-4 border-[#095c2e] active:border-b-0 active:translate-y-1"
+                        >
+                            <div className="flex items-center justify-between relative z-10">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                                        <FileSpreadsheet className="w-6 h-6" />
+                                    </div>
+                                    <div className="text-left">
+                                        <div className="font-black text-base">DOWNLOAD EXCEL</div>
+                                        <div className="text-[10px] font-medium text-white/80">Laporan Lengkap (Area, Sator, Promotor, SPC)</div>
                                     </div>
                                 </div>
-                            )}
-                        </div>
-                    </div>
+                                <Download className="w-5 h-5 opacity-50 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                        </button>
 
-                </div>
-
-                {/* SIMPLE PNG TEMPLATE - Format H/T/TGT */}
-                <div style={{ position: 'absolute', left: '-9999px', pointerEvents: 'none' }}>
-                    <div ref={reportRef} style={{ width: '800px', padding: '24px', backgroundColor: '#ffffff', fontFamily: 'Arial, sans-serif' }}>
-
-                        {/* Header */}
-                        <div style={{ borderBottom: '3px solid #1e293b', paddingBottom: '16px', marginBottom: '20px' }}>
-                            <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>
-                                {includeSpcData && !includePerformance && !includeUnderperform ? 'SPC GRUP' : 'LAPORAN MANAGER AREA'}
-                            </h1>
-                            {includeSpcData && !includePerformance && !includeUnderperform && (
-                                <div style={{ fontSize: '13px', color: '#7c3aed', margin: '8px 0 0 0', fontWeight: 'bold' }}>
-                                    <div>AREA: TIMOR-SUMBA</div>
-                                    <div>MANAGER AREA: {user?.name || 'N/A'}</div>
+                        {/* 2. AREA SUMMARY IMAGE */}
+                        <button
+                            disabled={loading || exporting}
+                            onClick={async () => {
+                                setExportFormat('png');
+                                setIncludePerformance(true);
+                                handleExport('png', true, false, 'area');
+                            }}
+                            className="w-full bg-white hover:bg-slate-50 text-slate-800 p-4 rounded-2xl border-2 border-slate-200 shadow-sm transition-all flex items-center justify-between group"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-600">
+                                    <Image className="w-5 h-5" />
                                 </div>
-                            )}
-                            <p style={{ fontSize: '14px', color: '#64748b', margin: '4px 0 0 0' }}>
-                                {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} | Periode: {periodLabel}
-                            </p>
-                            <p style={{ fontSize: '11px', color: '#94a3b8', margin: '4px 0 0 0' }}>
-                                Format: Hari Ini / Total Bulan{includeSpcData ? '' : ' / Target'}
-                            </p>
-                        </div>
-
-                        {/* Performance Area Table */}
-                        {includePerformance && areas.length > 0 && (
-                            <div style={{ marginBottom: '24px' }}>
-                                <h2 style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e293b', marginBottom: '8px', borderLeft: '4px solid #3b82f6', paddingLeft: '8px' }}>PERFORMANCE AREA</h2>
-                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-                                    <thead>
-                                        <tr style={{ backgroundColor: '#1e293b', color: '#ffffff' }}>
-                                            <th style={{ padding: '8px', textAlign: 'left', fontWeight: 'bold' }}>AREA</th>
-                                            <th style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>INPUT (H/T/TGT)</th>
-                                            <th style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>CLOSING</th>
-                                            <th style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>PENDING</th>
-                                            <th style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>REJECT</th>
-                                            <th style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>%</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {areas.map((a, i) => {
-                                            const pct = a.target > 0 ? Math.round((a.total_input / a.target) * 100) : 0;
-                                            return (
-                                                <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                                                    <td style={{ padding: '8px', fontWeight: 'bold', color: '#1e293b' }}>{a.name}</td>
-                                                    <td style={{ padding: '8px', textAlign: 'center', fontFamily: 'monospace', color: '#3b82f6', fontWeight: 'bold' }}>{a.daily_input || 0}/{a.total_input}/{a.target}</td>
-                                                    <td style={{ padding: '8px', textAlign: 'center', fontFamily: 'monospace', color: '#10b981' }}>{a.daily_closed || 0}/{a.total_closed}</td>
-                                                    <td style={{ padding: '8px', textAlign: 'center', fontFamily: 'monospace', color: '#f59e0b' }}>{a.daily_pending || 0}/{a.total_pending}</td>
-                                                    <td style={{ padding: '8px', textAlign: 'center', fontFamily: 'monospace', color: '#ef4444' }}>{a.daily_rejected || 0}/{a.total_rejected}</td>
-                                                    <td style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold', color: pct >= timeGonePercent ? '#10b981' : '#ef4444' }}>{pct}%</td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
+                                <div className="text-left">
+                                    <div className="font-bold text-sm">GAMBAR SUMMARY AREA</div>
+                                    <div className="text-[10px] text-slate-500">Ringkasan Performa SPV & Sator</div>
+                                </div>
                             </div>
-                        )}
+                            <Download className="w-4 h-4 text-slate-400 group-hover:text-primary transition-colors" />
+                        </button>
 
-                        {/* Performance Sator Table */}
-                        {includePerformance && sators.length > 0 && (
-                            <div style={{ marginBottom: '24px' }}>
-                                <h2 style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e293b', marginBottom: '8px', borderLeft: '4px solid #8b5cf6', paddingLeft: '8px' }}>DETAIL SATOR</h2>
-                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
-                                    <thead>
-                                        <tr style={{ backgroundColor: '#1e293b', color: '#ffffff' }}>
-                                            <th style={{ padding: '6px', textAlign: 'left', fontWeight: 'bold' }}>AREA</th>
-                                            <th style={{ padding: '6px', textAlign: 'left', fontWeight: 'bold' }}>SATOR</th>
-                                            <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>INPUT (H/T/TGT)</th>
-                                            <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>CLO</th>
-                                            <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>PND</th>
-                                            <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>REJ</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {sators.slice(0, 15).map((s, i) => (
-                                            <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                                                <td style={{ padding: '6px', color: '#64748b', fontSize: '10px' }}>{s.area}</td>
-                                                <td style={{ padding: '6px', fontWeight: 'bold', color: '#1e293b' }}>{s.name}</td>
-                                                <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#3b82f6', fontWeight: 'bold' }}>{s.daily_input || 0}/{s.total_input}/{s.target}</td>
-                                                <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#10b981' }}>{s.daily_closed || 0}/{s.total_closed}</td>
-                                                <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#f59e0b' }}>{s.daily_pending || 0}/{s.total_pending}</td>
-                                                <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#ef4444' }}>{s.daily_rejected || 0}/{s.total_rejected}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                                {sators.length > 15 && <p style={{ fontSize: '10px', color: '#94a3b8', marginTop: '4px' }}>... dan {sators.length - 15} sator lainnya</p>}
+                        {/* 3. PROMOTOR IMAGE */}
+                        <button
+                            disabled={loading || exporting}
+                            onClick={async () => {
+                                setExportFormat('png');
+                                setIncludePerformance(true);
+                                handleExport('png', true, false, 'promotor');
+                            }}
+                            className="w-full bg-white hover:bg-slate-50 text-slate-800 p-4 rounded-2xl border-2 border-slate-200 shadow-sm transition-all flex items-center justify-between group"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center text-violet-600">
+                                    <Image className="w-5 h-5" />
+                                </div>
+                                <div className="text-left">
+                                    <div className="font-bold text-sm">GAMBAR DETAIL PROMOTOR</div>
+                                    <div className="text-[10px] text-slate-500">Daftar Lengkap Promotor</div>
+                                </div>
                             </div>
+                            <Download className="w-4 h-4 text-slate-400 group-hover:text-primary transition-colors" />
+                        </button>
+
+                        {/* 4. SPC IMAGE */}
+                        {hasSpcAccess && (
+                            <button
+                                disabled={loading || exporting}
+                                onClick={async () => {
+                                    setExportFormat('png');
+                                    setIncludeSpcData(true);
+                                    handleExport('png', false, true, 'spc');
+                                }}
+                                className="w-full bg-white hover:bg-slate-50 text-slate-800 p-4 rounded-2xl border-2 border-slate-200 shadow-sm transition-all flex items-center justify-between group"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600">
+                                        <Image className="w-5 h-5" />
+                                    </div>
+                                    <div className="text-left">
+                                        <div className="font-bold text-sm">GAMBAR SPC STORE</div>
+                                        <div className="text-[10px] text-slate-500">Performa Toko & Promotor SPC</div>
+                                    </div>
+                                </div>
+                                <Download className="w-4 h-4 text-slate-400 group-hover:text-primary transition-colors" />
+                            </button>
                         )}
-
-                        {/* Underperform List */}
-                        {includeUnderperform && (
-                            <div style={{ marginBottom: '24px' }}>
-                                <h2 style={{ fontSize: '16px', fontWeight: 'bold', color: '#dc2626', marginBottom: '8px', borderLeft: '4px solid #dc2626', paddingLeft: '8px' }}>UNDERPERFORM ({`< ${timeGonePercent}%`})</h2>
-                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
-                                    <thead>
-                                        <tr style={{ backgroundColor: '#fef2f2', color: '#dc2626' }}>
-                                            <th style={{ padding: '6px', textAlign: 'left', fontWeight: 'bold' }}>LEVEL</th>
-                                            <th style={{ padding: '6px', textAlign: 'left', fontWeight: 'bold' }}>NAMA</th>
-                                            <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>INPUT (H/T/TGT)</th>
-                                            <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>GAP</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {[...sators.filter(isUnderperform).slice(0, 10)].map((s, i) => (
-                                            <tr key={i} style={{ backgroundColor: '#fff', borderBottom: '1px solid #fecaca' }}>
-                                                <td style={{ padding: '6px', color: '#dc2626', fontSize: '10px' }}>SATOR</td>
-                                                <td style={{ padding: '6px', fontWeight: 'bold', color: '#1e293b' }}>{s.name}</td>
-                                                <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#dc2626', fontWeight: 'bold' }}>{s.daily_input || 0}/{s.total_input}/{s.target}</td>
-                                                <td style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold', color: '#dc2626' }}>{s.target - s.total_input}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-
-                        {/* SPC Data */}
-                        {includeSpcData && spcStores.length > 0 && (
-                            <div style={{ marginBottom: '24px', pageBreakInside: 'avoid' }}>
-                                {/* Tabel Toko */}
-                                <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: '#7c3aed', marginBottom: '8px', borderLeft: '4px solid #7c3aed', paddingLeft: '8px' }}>
-                                    PERFORMANCE TOKO ({spcStores.length} Toko)
-                                </h3>
-                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', marginBottom: '20px' }}>
-                                    <thead>
-                                        <tr style={{ backgroundColor: '#7c3aed', color: '#ffffff' }}>
-                                            <th style={{ padding: '6px', textAlign: 'left', fontWeight: 'bold' }}>TOKO</th>
-                                            <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>TARGET</th>
-                                            <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>INPUT (H/T)</th>
-                                            <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>%</th>
-                                            <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>CLO</th>
-                                            <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>PND</th>
-                                            <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>REJ</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {spcStores.map((s, i) => {
-                                            const pct = s.target > 0 ? Math.round((s.total_input / s.target) * 100) : 0;
-                                            return (
-                                                <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#faf5ff', borderBottom: '1px solid #e9d5ff' }}>
-                                                    <td style={{ padding: '6px', fontWeight: 'bold', color: '#1e293b' }}>{s.store_name}</td>
-                                                    <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#64748b' }}>{s.target}</td>
-                                                    <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#7c3aed', fontWeight: 'bold' }}>{s.daily_input || 0}/{s.total_input}</td>
-                                                    <td style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold', color: pct >= timeGonePercent ? '#10b981' : '#ef4444' }}>{pct}%</td>
-                                                    <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#10b981' }}>{s.daily_closed || 0}/{s.total_closed}</td>
-                                                    <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#f59e0b' }}>{s.daily_pending || 0}/{s.total_pending}</td>
-                                                    <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#ef4444' }}>{s.daily_rejected || 0}/{s.total_rejected}</td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-
-                                {/* Detail Per Promotor */}
-                                <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: '#7c3aed', marginBottom: '8px', borderLeft: '4px solid #7c3aed', paddingLeft: '8px' }}>
-                                    DETAIL PER PROMOTOR
-                                </h3>
-                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
-                                    <thead>
-                                        <tr style={{ backgroundColor: '#a78bfa', color: '#ffffff' }}>
-                                            <th style={{ padding: '5px', textAlign: 'left', fontWeight: 'bold' }}>TOKO</th>
-                                            <th style={{ padding: '5px', textAlign: 'left', fontWeight: 'bold' }}>PROMOTOR</th>
-                                            <th style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold' }}>TARGET</th>
-                                            <th style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold' }}>INPUT (H/T)</th>
-                                            <th style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold' }}>%</th>
-                                            <th style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold' }}>CLO</th>
-                                            <th style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold' }}>PND</th>
-                                            <th style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold' }}>REJ</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {spcStores.map((store, storeIdx) => {
-                                            if (!store.promotors || store.promotors.length === 0) {
-                                                return (
-                                                    <tr key={`store-${storeIdx}`} style={{ backgroundColor: storeIdx % 2 === 0 ? '#fefce8' : '#fef9c3', borderBottom: '1px solid #fde047' }}>
-                                                        <td style={{ padding: '5px', color: '#78716c', fontSize: '9px' }}>{store.store_name}</td>
-                                                        <td colSpan={7} style={{ padding: '5px', textAlign: 'center', fontStyle: 'italic', color: '#78716c' }}>(Tidak ada promotor)</td>
-                                                    </tr>
-                                                );
-                                            }
-                                            return store.promotors.map((promotor, promIdx) => {
-                                                const promotorPct = promotor.target && promotor.target > 0 ? Math.round((promotor.total_input / promotor.target) * 100) : 0;
-                                                return (
-                                                    <tr key={`${storeIdx}-${promIdx}`} style={{ backgroundColor: storeIdx % 2 === 0 ? '#ffffff' : '#faf5ff', borderBottom: '1px solid #e9d5ff' }}>
-                                                        <td style={{ padding: '5px', color: '#64748b', fontSize: '9px' }}>{promIdx === 0 ? store.store_name : ''}</td>
-                                                        <td style={{ padding: '5px', fontWeight: 'bold', color: '#1e293b' }}>{promotor.name}</td>
-                                                        <td style={{ padding: '5px', textAlign: 'center', fontFamily: 'monospace', color: '#64748b' }}>{promotor.target || 0}</td>
-                                                        <td style={{ padding: '5px', textAlign: 'center', fontFamily: 'monospace', color: '#7c3aed', fontWeight: 'bold' }}>{promotor.daily_input || 0}/{promotor.total_input}</td>
-                                                        <td style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold', color: promotorPct >= timeGonePercent ? '#10b981' : '#ef4444' }}>{promotorPct}%</td>
-                                                        <td style={{ padding: '5px', textAlign: 'center', fontFamily: 'monospace', color: '#10b981' }}>{promotor.daily_closed || 0}/{promotor.total_closed || 0}</td>
-                                                        <td style={{ padding: '5px', textAlign: 'center', fontFamily: 'monospace', color: '#f59e0b' }}>{promotor.daily_pending || 0}/{promotor.total_pending || 0}</td>
-                                                        <td style={{ padding: '5px', textAlign: 'center', fontFamily: 'monospace', color: '#ef4444' }}>{promotor.daily_rejected || 0}/{promotor.total_rejected || 0}</td>
-                                                    </tr>
-                                                );
-                                            });
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-
-
                     </div>
-                </div>
-
-                {/* 3. Sticky Action Bottom - Positioned above floating nav */}
-                <div className="fixed bottom-[82px] left-0 right-0 px-5 z-40">
-                    <button
-                        onClick={handleExport}
-                        disabled={exporting || (!includePerformance && !includeUnderperform && !includeSpcData)}
-                        className={cn(
-                            "w-full h-16 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-[0_8px_30px_rgb(0,0,0,0.12)] active:scale-[0.97]",
-                            exporting
-                                ? "bg-muted text-muted-foreground"
-                                : "bg-primary text-white hover:shadow-primary/20"
-                        )}
-                    >
-                        {exporting ? (
-                            <div className="flex items-center gap-2">
-                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                <span className="font-bold">SEDANG PROSES...</span>
-                            </div>
-                        ) : (
-                            <>
-                                <Download className="w-6 h-6 stroke-[3]" />
-                                <span className="text-lg font-black tracking-widest uppercase">TARIK LAPORAN</span>
-                            </>
-                        )}
-                    </button>
                 </div>
 
                 <ProfileSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
             </div>
 
-            {/* PNG TEMPLATE - SPC (Hidden, separate for split export) */}
-            {spcStores.length > 0 && (
-                <div style={{ position: 'absolute', left: '-9999px', pointerEvents: 'none' }}>
-                    <div ref={spcTableRef} style={{ width: '800px', padding: '24px', backgroundColor: '#ffffff', fontFamily: 'Arial, sans-serif' }}>
-                        {/* Header SPC */}
-                        <div style={{ borderBottom: '3px solid #7c3aed', paddingBottom: '16px', marginBottom: '20px' }}>
-                            <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: '#7c3aed', margin: 0 }}>SPC GRUP - PERFORMANCE TOKO</h1>
-                            <p style={{ fontSize: '14px', color: '#64748b', margin: '4px 0 0 0' }}>
-                                {user?.name} | {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} | Periode: {periodLabel}
-                            </p>
-                            <p style={{ fontSize: '11px', color: '#94a3b8', margin: '4px 0 0 0' }}>Format: Hari Ini / Total Bulan / Target | Time Gone: {timeGonePercent}%</p>
-                        </div>
+            {/* HIDDEN TEMPLATES FOR PNG EXPORT */}
+            <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+                {/* 1. AREA & SATOR SUMMARY */}
+                <div ref={areaTableRef} style={{ width: '800px', padding: '32px', backgroundColor: '#ffffff', fontFamily: 'Arial, sans-serif' }}>
+                    <div style={{ borderBottom: '4px solid #1e293b', paddingBottom: '16px', marginBottom: '24px' }}>
+                        <h1 style={{ fontSize: '32px', fontWeight: '900', color: '#1e293b', margin: 0, letterSpacing: '-0.5px' }}>LAPORAN MANAGER AREA</h1>
+                        <p style={{ fontSize: '14px', color: '#64748b', margin: '8px 0 0 0', fontWeight: 'bold' }}>
+                            {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} | Periode: {periodLabel}
+                        </p>
+                        <p style={{ fontSize: '12px', color: '#94a3b8', margin: '4px 0 0 0' }}>Data: {areas.length} SPV | {sators.length} Sator | {promotors.length} Promotor</p>
+                    </div>
 
-                        {/* Tabel Toko */}
-                        <div style={{ marginBottom: '24px' }}>
-                            <h2 style={{ fontSize: '16px', fontWeight: 'bold', color: '#7c3aed', marginBottom: '8px', borderLeft: '4px solid #7c3aed', paddingLeft: '8px' }}>PERFORMANCE TOKO ({spcStores.length} Toko)</h2>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
-                                <thead>
-                                    <tr style={{ backgroundColor: '#7c3aed', color: '#ffffff' }}>
-                                        <th style={{ padding: '6px', textAlign: 'left', fontWeight: 'bold' }}>TOKO</th>
-                                        <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>TGT</th>
-                                        <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>INPUT (H/T)</th>
-                                        <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>%</th>
-                                        <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>CLO (H/T)</th>
-                                        <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>PND (H/T)</th>
-                                        <th style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>REJ (H/T)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {spcStores.map((s, i) => {
-                                        const pct = s.target > 0 ? Math.round((s.total_input / s.target) * 100) : 0;
-                                        return (
-                                            <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#faf5ff', borderBottom: '1px solid #e9d5ff' }}>
-                                                <td style={{ padding: '6px', fontWeight: 'bold', color: '#1e293b' }}>{s.store_name}</td>
-                                                <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#64748b' }}>{s.target}</td>
-                                                <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#7c3aed', fontWeight: 'bold' }}>{s.daily_input || 0}/{s.total_input}</td>
-                                                <td style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold', color: pct >= timeGonePercent ? '#10b981' : '#ef4444' }}>{pct}%</td>
-                                                <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#10b981' }}>{s.daily_closed || 0}/{s.total_closed}</td>
-                                                <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#f59e0b' }}>{s.daily_pending || 0}/{s.total_pending}</td>
-                                                <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#ef4444' }}>{s.daily_rejected || 0}/{s.total_rejected}</td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* Detail Per Promotor */}
-                        <div style={{ marginBottom: '24px' }}>
-                            <h2 style={{ fontSize: '16px', fontWeight: 'bold', color: '#7c3aed', marginBottom: '8px', borderLeft: '4px solid #7c3aed', paddingLeft: '8px' }}>DETAIL PER PROMOTOR</h2>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
-                                <thead>
-                                    <tr style={{ backgroundColor: '#a78bfa', color: '#ffffff' }}>
-                                        <th style={{ padding: '5px', textAlign: 'left', fontWeight: 'bold' }}>TOKO</th>
-                                        <th style={{ padding: '5px', textAlign: 'left', fontWeight: 'bold' }}>PROMOTOR</th>
-                                        <th style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold' }}>TGT</th>
-                                        <th style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold' }}>INPUT (H/T)</th>
-                                        <th style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold' }}>%</th>
-                                        <th style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold' }}>CLO (H/T)</th>
-                                        <th style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold' }}>PND (H/T)</th>
-                                        <th style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold' }}>REJ (H/T)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {spcStores.map((store, storeIdx) => {
-                                        if (!store.promotors || store.promotors.length === 0) {
-                                            return (
-                                                <tr key={`store-${storeIdx}`} style={{ backgroundColor: storeIdx % 2 === 0 ? '#fefce8' : '#fef9c3', borderBottom: '1px solid #fde047' }}>
-                                                    <td style={{ padding: '5px', color: '#78716c', fontSize: '9px' }}>{store.store_name}</td>
-                                                    <td colSpan={7} style={{ padding: '5px', textAlign: 'center', fontStyle: 'italic', color: '#78716c' }}>(Tidak ada promotor)</td>
-                                                </tr>
-                                            );
-                                        }
-                                        return store.promotors.map((promotor, promIdx) => {
-                                            const promotorPct = promotor.target && promotor.target > 0 ? Math.round((promotor.total_input / promotor.target) * 100) : 0;
-                                            return (
-                                                <tr key={`${storeIdx}-${promIdx}`} style={{ backgroundColor: storeIdx % 2 === 0 ? '#ffffff' : '#faf5ff', borderBottom: '1px solid #e9d5ff' }}>
-                                                    <td style={{ padding: '5px', color: '#64748b', fontSize: '9px' }}>{promIdx === 0 ? store.store_name : ''}</td>
-                                                    <td style={{ padding: '5px', fontWeight: 'bold', color: '#1e293b' }}>{promotor.name}</td>
-                                                    <td style={{ padding: '5px', textAlign: 'center', fontFamily: 'monospace', color: '#64748b' }}>{promotor.target || 0}</td>
-                                                    <td style={{ padding: '5px', textAlign: 'center', fontFamily: 'monospace', color: '#7c3aed', fontWeight: 'bold' }}>{promotor.daily_input || 0}/{promotor.total_input}</td>
-                                                    <td style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold', color: promotorPct >= timeGonePercent ? '#10b981' : '#ef4444' }}>{promotorPct}%</td>
-                                                    <td style={{ padding: '5px', textAlign: 'center', fontFamily: 'monospace', color: '#10b981' }}>{promotor.daily_closed || 0}/{promotor.total_closed || 0}</td>
-                                                    <td style={{ padding: '5px', textAlign: 'center', fontFamily: 'monospace', color: '#f59e0b' }}>{promotor.daily_pending || 0}/{promotor.total_pending || 0}</td>
-                                                    <td style={{ padding: '5px', textAlign: 'center', fontFamily: 'monospace', color: '#ef4444' }}>{promotor.daily_rejected || 0}/{promotor.total_rejected || 0}</td>
-                                                </tr>
-                                            );
-                                        });
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-
-
+                    {/* SPV Table */}
+                    <div style={{ marginBottom: '32px' }}>
+                        <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#3b82f6', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ width: '6px', height: '24px', backgroundColor: '#3b82f6', display: 'block', borderRadius: '4px' }}></span>
+                            PERFORMA SUPERVISOR (AREA)
+                        </h2>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                            <thead>
+                                <tr style={{ backgroundColor: '#1e293b', color: '#ffffff' }}>
+                                    <th style={{ padding: '10px', textAlign: 'left' }}>AREA / SPV</th>
+                                    <th style={{ padding: '10px', textAlign: 'center' }}>TARGET</th>
+                                    <th style={{ padding: '10px', textAlign: 'center' }}>INPUT</th>
+                                    <th style={{ padding: '10px', textAlign: 'center' }}>%</th>
+                                    <th style={{ padding: '10px', textAlign: 'center' }}>CLO</th>
+                                    <th style={{ padding: '10px', textAlign: 'center' }}>PND</th>
+                                    <th style={{ padding: '10px', textAlign: 'center' }}>REJ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {areas.map((a, i) => {
+                                    const pct = a.target > 0 ? Math.round((a.total_input / a.target) * 100) : 0;
+                                    return (
+                                        <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#fff' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                                            <td style={{ padding: '10px', fontWeight: 'bold' }}>{a.name}</td>
+                                            <td style={{ padding: '10px', textAlign: 'center', color: '#64748b' }}>{a.target}</td>
+                                            <td style={{ padding: '10px', textAlign: 'center', fontWeight: 'bold', color: '#3b82f6' }}>{a.total_input}</td>
+                                            <td style={{ padding: '10px', textAlign: 'center', fontWeight: 'bold', color: pct >= timeGonePercent ? '#10b981' : '#ef4444' }}>{pct}%</td>
+                                            <td style={{ padding: '10px', textAlign: 'center', color: '#10b981' }}>{a.total_closed}</td>
+                                            <td style={{ padding: '10px', textAlign: 'center', color: '#f59e0b' }}>{a.total_pending}</td>
+                                            <td style={{ padding: '10px', textAlign: 'center', color: '#ef4444' }}>{a.total_rejected}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-            )}
+
+                {/* 2. SATOR DETAIL */}
+                <div ref={satorTableRef} style={{ width: '800px', padding: '32px', backgroundColor: '#ffffff', fontFamily: 'Arial, sans-serif' }}>
+                    <div style={{ borderBottom: '4px solid #8b5cf6', paddingBottom: '16px', marginBottom: '24px' }}>
+                        <h1 style={{ fontSize: '28px', fontWeight: '900', color: '#8b5cf6', margin: 0 }}>DETAIL SALES COORDINATOR (SATOR)</h1>
+                        <p style={{ fontSize: '14px', color: '#64748b', margin: '8px 0 0 0' }}>Periode: {periodLabel}</p>
+                    </div>
+
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                        <thead>
+                            <tr style={{ backgroundColor: '#5b21b6', color: '#ffffff' }}>
+                                <th style={{ padding: '8px', textAlign: 'left' }}>NO</th>
+                                <th style={{ padding: '8px', textAlign: 'left' }}>SATOR</th>
+                                <th style={{ padding: '8px', textAlign: 'left' }}>AREA</th>
+                                <th style={{ padding: '8px', textAlign: 'center' }}>TARGET</th>
+                                <th style={{ padding: '8px', textAlign: 'center' }}>INPUT</th>
+                                <th style={{ padding: '8px', textAlign: 'center' }}>%</th>
+                                <th style={{ padding: '8px', textAlign: 'center' }}>CLO</th>
+                                <th style={{ padding: '8px', textAlign: 'center' }}>PND</th>
+                                <th style={{ padding: '8px', textAlign: 'center' }}>REJ</th>
+                                <th style={{ padding: '8px', textAlign: 'center' }}>STATUS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {sators.map((s, i) => {
+                                const pct = s.target > 0 ? Math.round((s.total_input / s.target) * 100) : 0;
+                                const isOk = pct >= timeGonePercent;
+                                return (
+                                    <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#fff' : '#f5f3ff', borderBottom: '1px solid #ddd6fe' }}>
+                                        <td style={{ padding: '8px', textAlign: 'left', color: '#64748b' }}>{i + 1}</td>
+                                        <td style={{ padding: '8px', fontWeight: 'bold' }}>{s.name}</td>
+                                        <td style={{ padding: '8px', color: '#64748b' }}>{s.area}</td>
+                                        <td style={{ padding: '8px', textAlign: 'center' }}>{s.target}</td>
+                                        <td style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold', color: '#7c3aed' }}>{s.total_input}</td>
+                                        <td style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold', color: isOk ? '#10b981' : '#ef4444' }}>{pct}%</td>
+                                        <td style={{ padding: '8px', textAlign: 'center', color: '#10b981' }}>{s.total_closed}</td>
+                                        <td style={{ padding: '8px', textAlign: 'center', color: '#f59e0b' }}>{s.total_pending}</td>
+                                        <td style={{ padding: '8px', textAlign: 'center', color: '#ef4444' }}>{s.total_rejected}</td>
+                                        <td style={{ padding: '8px', textAlign: 'center' }}>
+                                            <span style={{
+                                                padding: '2px 8px',
+                                                borderRadius: '99px',
+                                                fontSize: '10px',
+                                                fontWeight: 'bold',
+                                                backgroundColor: isOk ? '#dcfce7' : '#fee2e2',
+                                                color: isOk ? '#166534' : '#991b1b'
+                                            }}>
+                                                {isOk ? 'ON TRACK' : 'UNDERPERFORM'}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* 3. PROMOTOR LIST */}
+                <div ref={promotorTableRef} style={{ width: '800px', padding: '32px', backgroundColor: '#ffffff', fontFamily: 'Arial, sans-serif' }}>
+                    <div style={{ borderBottom: '4px solid #ec4899', paddingBottom: '16px', marginBottom: '24px' }}>
+                        <h1 style={{ fontSize: '28px', fontWeight: '900', color: '#ec4899', margin: 0 }}>DETAIL PROMOTOR</h1>
+                        <p style={{ fontSize: '14px', color: '#64748b', margin: '8px 0 0 0' }}>Periode: {periodLabel}</p>
+                    </div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                        <thead>
+                            <tr style={{ backgroundColor: '#be185d', color: '#ffffff' }}>
+                                <th style={{ padding: '6px', textAlign: 'left' }}>NAMA</th>
+                                <th style={{ padding: '6px', textAlign: 'left' }}>SATOR</th>
+                                <th style={{ padding: '6px', textAlign: 'center' }}>TGT</th>
+                                <th style={{ padding: '6px', textAlign: 'center' }}>IN</th>
+                                <th style={{ padding: '6px', textAlign: 'center' }}>%</th>
+                                <th style={{ padding: '6px', textAlign: 'center' }}>CLO</th>
+                                <th style={{ padding: '6px', textAlign: 'center' }}>PEND</th>
+                                <th style={{ padding: '6px', textAlign: 'center' }}>REJ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {promotors.map((p, i) => {
+                                const pct = p.target > 0 ? Math.round((p.total_input / p.target) * 100) : 0;
+                                return (
+                                    <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#fff' : '#fdf2f8', borderBottom: '1px solid #fbcfe8' }}>
+                                        <td style={{ padding: '6px', fontWeight: 'bold', color: '#1e293b' }}>{p.name}</td>
+                                        <td style={{ padding: '6px', color: '#64748b', fontSize: '10px' }}>{p.sator_name}</td>
+                                        <td style={{ padding: '6px', textAlign: 'center', color: '#64748b' }}>{p.target}</td>
+                                        <td style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold', color: '#db2777' }}>{p.total_input}</td>
+                                        <td style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold', color: pct >= timeGonePercent ? '#10b981' : '#ef4444' }}>{pct}%</td>
+                                        <td style={{ padding: '6px', textAlign: 'center', color: '#10b981' }}>{p.total_closed}</td>
+                                        <td style={{ padding: '6px', textAlign: 'center', color: '#f59e0b' }}>{p.total_pending}</td>
+                                        <td style={{ padding: '6px', textAlign: 'center', color: '#ef4444' }}>{p.total_rejected}</td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* 4. SPC DATA */}
+                <div ref={spcTableRef} style={{ width: '800px', padding: '32px', backgroundColor: '#ffffff', fontFamily: 'Arial, sans-serif' }}>
+                    <div style={{ borderBottom: '4px solid #7c3aed', paddingBottom: '16px', marginBottom: '24px' }}>
+                        <h1 style={{ fontSize: '28px', fontWeight: '900', color: '#7c3aed', margin: 0 }}>DATA TOKO STRATEGIS (SPC)</h1>
+                        <p style={{ fontSize: '14px', color: '#64748b', margin: '8px 0 0 0' }}>Periode: {periodLabel}</p>
+                    </div>
+
+                    <div style={{ marginBottom: '24px' }}>
+                        <h2 style={{ fontSize: '16px', fontWeight: 'bold', color: '#7c3aed', marginBottom: '8px' }}>PERFORMA TOKO ({spcStores.length})</h2>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                            <thead>
+                                <tr style={{ backgroundColor: '#6d28d9', color: '#ffffff' }}>
+                                    <th style={{ padding: '8px', textAlign: 'left' }}>NAMA TOKO</th>
+                                    <th style={{ padding: '8px', textAlign: 'center' }}>TARGET</th>
+                                    <th style={{ padding: '8px', textAlign: 'center' }}>INPUT</th>
+                                    <th style={{ padding: '8px', textAlign: 'center' }}>%</th>
+                                    <th style={{ padding: '8px', textAlign: 'center' }}>CLO</th>
+                                    <th style={{ padding: '8px', textAlign: 'center' }}>PND</th>
+                                    <th style={{ padding: '8px', textAlign: 'center' }}>REJ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {spcStores.map((s, i) => {
+                                    const pct = s.target > 0 ? Math.round((s.total_input / s.target) * 100) : 0;
+                                    return (
+                                        <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#fff' : '#f5f3ff', borderBottom: '1px solid #ddd6fe' }}>
+                                            <td style={{ padding: '8px', fontWeight: 'bold', color: '#1e293b' }}>{s.store_name}</td>
+                                            <td style={{ padding: '8px', textAlign: 'center', color: '#64748b' }}>{s.target}</td>
+                                            <td style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold', color: '#7c3aed' }}>{s.total_input}</td>
+                                            <td style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold', color: pct >= timeGonePercent ? '#10b981' : '#ef4444' }}>{pct}%</td>
+                                            <td style={{ padding: '8px', textAlign: 'center', color: '#10b981' }}>{s.total_closed}</td>
+                                            <td style={{ padding: '8px', textAlign: 'center', color: '#f59e0b' }}>{s.total_pending}</td>
+                                            <td style={{ padding: '8px', textAlign: 'center', color: '#ef4444' }}>{s.total_rejected}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
         </DashboardLayout>
     );
-}
+};

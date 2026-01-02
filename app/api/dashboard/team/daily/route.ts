@@ -29,7 +29,13 @@ export async function GET(request: NextRequest) {
     }
 
     const teamMemberIds = teamMembers.map((m) => m.user_id)
-    const today = new Date().toISOString().split('T')[0]
+    // FIX: Use WITA timezone instead of UTC toISOString
+    const today = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Makassar',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(new Date())
 
     const { data, error } = await supabase
       .from('agg_daily_promoter')
