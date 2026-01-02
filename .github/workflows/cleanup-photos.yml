@@ -18,7 +18,7 @@ jobs:
           echo "🗑️ Starting Cloudinary cleanup..."
           
           RESPONSE=$(curl -s -w "\n%{http_code}" \
-            -X GET "https://vivo-vast-project.vercel.app/api/cron/cleanup-photos" \
+            -X GET "https://gptcrazyvast.vercel.app/api/cron/cleanup-photos" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
           
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
