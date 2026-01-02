@@ -1,0 +1,59 @@
+name: Cloudinary Photo Cleanup
+
+on:
+  schedule:
+    # Runs every Sunday at 9 PM UTC (5 AM WITA - Subuh)
+    - cron: '0 21 * * 6'  # Saturday 9 PM UTC = Sunday 5 AM WITA
+  
+  # Allow manual trigger for testing
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Trigger Cloudinary Cleanup
+        run: |
+          echo "🗑️ Starting Cloudinary cleanup..."
+          
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X GET "https://vivo-vast-project.vercel.app/api/cron/cleanup-photos" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+          
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n-1)
+          
+          echo "📊 Response:"
+          echo "$BODY" | jq '.' || echo "$BODY"
+          
+          echo "📡 Status Code: $HTTP_CODE"
+          
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "❌ Error: Cleanup failed with status $HTTP_CODE"
+            exit 1
+          fi
+          
+          # Check if cleanup was successful
+          SUCCESS=$(echo "$BODY" | jq -r '.success')
+          DELETED=$(echo "$BODY" | jq -r '.deleted // 0')
+          FAILED=$(echo "$BODY" | jq -r '.failed // 0')
+          
+          echo "✅ Cleanup completed"
+          echo "   Deleted: $DELETED photos"
+          echo "   Failed: $FAILED photos"
+          
+          if [ "$SUCCESS" != "true" ]; then
+            echo "⚠️ Warning: Cleanup reported failure"
+            exit 1
+          fi
+          
+      - name: Notify on Success
+        if: success()
+        run: |
+          echo "🎉 Cloudinary cleanup completed successfully!"
+          
+      - name: Notify on Failure
+        if: failure()
+        run: |
+          echo "🚨 Cloudinary cleanup failed! Check logs above."
