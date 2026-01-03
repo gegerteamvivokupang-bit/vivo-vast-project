@@ -29,7 +29,14 @@ export async function GET(request: NextRequest) {
     }
 
     const teamMemberIds = teamMembers.map((m) => m.user_id)
-    const currentMonth = new Date().toISOString().slice(0, 7) + '-01'
+    // FIX: Use WITA timezone instead of UTC
+    const witaDate = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Makassar',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(new Date())
+    const currentMonth = witaDate.slice(0, 7) + '-01'
 
     const { data, error } = await supabase
       .from('agg_monthly_promoter')
