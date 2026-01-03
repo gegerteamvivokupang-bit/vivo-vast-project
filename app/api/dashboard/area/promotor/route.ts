@@ -41,9 +41,14 @@ export async function GET(request: NextRequest) {
 
     const userIds = areaUsers.map((u) => u.user_id)
 
-    // Get current month
-    const now = new Date()
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+    // Get current month in WITA timezone
+    const witaDate = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Makassar',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(new Date())
+    const currentMonth = witaDate.substring(0, 7) + '-01'
 
     // Query aggregated data
     const { data: aggData, error: aggError } = await supabase
