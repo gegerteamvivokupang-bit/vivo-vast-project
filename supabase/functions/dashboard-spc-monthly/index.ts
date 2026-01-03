@@ -83,9 +83,15 @@ Deno.serve(async (req) => {
             )
         }
 
-        // Default ke bulan ini jika tidak ada month
+        // Default ke bulan ini jika tidak ada month - FIX: Use WITA timezone
         const now = new Date();
-        const targetMonth = month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const witaMonth = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Makassar',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        }).format(now).substring(0, 7);
+        const targetMonth = month || witaMonth;
 
         // Format untuk query: YYYY-MM-01
         const queryMonth = `${targetMonth}-01`;

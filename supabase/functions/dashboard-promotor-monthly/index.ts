@@ -35,9 +35,14 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Bulan ini (format: YYYY-MM-01 untuk tipe DATE)
-    const now = new Date()
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+    // Bulan ini (format: YYYY-MM-01 untuk tipe DATE) - FIX: Use WITA timezone
+    const witaDate = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Makassar',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(new Date())
+    const currentMonth = witaDate.substring(0, 7) + '-01'
 
     // Query VIEW gabungan (tanpa target karena tidak ada di view)
     const { data, error } = await supabaseClient

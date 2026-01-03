@@ -342,28 +342,58 @@ BEGIN
             ON v.promoter_user_id = ap.user_id
             AND v.agg_date = p_date::DATE
     ),
-    sators_with_promotors AS (
+    -- FIX: Calculate sator totals by summing their promotors
+    sators_with_data AS (
         SELECT 
             sl.user_id,
             sl.name,
-            json_agg(
-                json_build_object(
-                    'promoter_user_id', pd.user_id,
-                    'promoter_name', pd.name,
-                    'employee_id', pd.employee_id,
-                    'total_input', pd.total_input,
-                    'total_rejected', pd.total_rejected,
-                    'total_pending', pd.total_pending,
-                    'total_closed', pd.total_closed,
-                    'total_approved', pd.total_approved,
-                    'total_closing_direct', pd.total_closing_direct,
-                    'total_closing_followup', pd.total_closing_followup,
-                    'agg_date', p_date
-                ) ORDER BY pd.name
-            ) FILTER (WHERE pd.user_id IS NOT NULL) as promotors
+            COALESCE(SUM(pd.total_input), 0)::INTEGER as total_input,
+            COALESCE(SUM(pd.total_closed), 0)::INTEGER as total_closed,
+            COALESCE(SUM(pd.total_pending), 0)::INTEGER as total_pending,
+            COALESCE(SUM(pd.total_rejected), 0)::INTEGER as total_rejected
         FROM sator_list sl
         LEFT JOIN promotor_data pd ON pd.sator_id = sl.user_id
         GROUP BY sl.user_id, sl.name
+    ),
+    -- Build promotors array for each sator
+    sators_complete AS (
+        SELECT 
+            swd.user_id,
+            swd.name,
+            swd.total_input,
+            swd.total_closed,
+            swd.total_pending,
+            swd.total_rejected,
+            COALESCE(
+                (
+                    SELECT json_agg(
+                        json_build_object(
+                            'user_id', pd.user_id::TEXT,
+                            'name', pd.name,
+                            'total_input', pd.total_input,
+                            'total_closed', pd.total_closed,
+                            'total_pending', pd.total_pending,
+                            'total_rejected', pd.total_rejected
+                        ) ORDER BY pd.total_input DESC
+                    )
+                    FROM promotor_data pd
+                    WHERE pd.sator_id = swd.user_id
+                ),
+                '[]'::json
+            ) as promotors
+        FROM sators_with_data swd
+    ),
+    -- Direct promotors (those directly under manager, not under any sator)
+    direct_promotors_data AS (
+        SELECT 
+            pd.user_id,
+            pd.name,
+            pd.total_input,
+            pd.total_closed,
+            pd.total_pending,
+            pd.total_rejected
+        FROM promotor_data pd
+        WHERE pd.sator_id IS NULL
     )
     SELECT json_build_object(
         'promotors', (SELECT json_agg(
@@ -382,17 +412,33 @@ BEGIN
                 'sator_id', sator_id
             ) ORDER BY name
         ) FROM promotor_data),
-        'sators', (SELECT json_agg(
-            json_build_object(
-                'user_id', user_id,
-                'name', name,
-                'promotor_ids', (
-                    SELECT json_agg(pd.user_id)
-                    FROM promotor_data pd
-                    WHERE pd.sator_id = swp.user_id
-                )
-            ) ORDER BY name
-        ) FROM sators_with_promotors swp)
+        'sators', (
+            SELECT COALESCE(json_agg(
+                json_build_object(
+                    'user_id', sc.user_id,
+                    'name', sc.name,
+                    'total_input', sc.total_input,
+                    'total_closed', sc.total_closed,
+                    'total_pending', sc.total_pending,
+                    'total_rejected', sc.total_rejected,
+                    'promotors', sc.promotors
+                ) ORDER BY sc.total_input DESC
+            ), '[]'::json)
+            FROM sators_complete sc
+        ),
+        'direct_promotors', (
+            SELECT COALESCE(json_agg(
+                json_build_object(
+                    'user_id', dp.user_id,
+                    'name', dp.name,
+                    'total_input', dp.total_input,
+                    'total_closed', dp.total_closed,
+                    'total_pending', dp.total_pending,
+                    'total_rejected', dp.total_rejected
+                ) ORDER BY dp.total_input DESC
+            ), '[]'::json)
+            FROM direct_promotors_data dp
+        )
     ) INTO v_result;
     
     RETURN v_result;

@@ -35,8 +35,13 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Tanggal hari ini
-    const today = new Date().toISOString().split('T')[0]
+    // Tanggal hari ini - FIX: Use WITA timezone instead of UTC
+    const today = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Makassar',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(new Date())
 
     // Query VIEW gabungan (bukan tabel langsung)
     const { data, error } = await supabaseClient
