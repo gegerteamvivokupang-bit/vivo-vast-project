@@ -52,31 +52,34 @@ Deno.serve(async (req) => {
       .eq('agg_month', currentMonth)
       .single()
 
-    if (error || !data) {
-      return new Response(
-        JSON.stringify({
-          total_input: 0,
-          total_pending: 0,
-          total_closed: 0,
-          total_closing_direct: 0,
-          total_closing_followup: 0,
-          target: 0,
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Fetch target dari tabel targets jika ada (use YYYY-MM format)
+    // ALWAYS fetch target, even if no aggregate data (for new promotors)
     let target = 0
     const { data: targetData } = await supabaseClient
       .from('targets')
       .select('target_value')
       .eq('user_id', userId)
       .eq('month', currentMonth.substring(0, 7))
+      .eq('target_type', 'primary')
       .single()
 
     if (targetData?.target_value) {
       target = targetData.target_value
+    }
+
+    // Return default values with target if no aggregate data
+    if (error || !data) {
+      return new Response(
+        JSON.stringify({
+          total_input: 0,
+          total_rejected: 0,
+          total_pending: 0,
+          total_closed: 0,
+          total_closing_direct: 0,
+          total_closing_followup: 0,
+          target: target,  // Include the fetched target!
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     return new Response(

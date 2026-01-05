@@ -121,11 +121,12 @@ Deno.serve(async (req) => {
         // Get all store IDs
         const storeIds = Array.from(storeMap.keys());
 
-        // Query all promotors in SPC stores
+        // Query all promotors in SPC stores (only ACTIVE)
         const { data: promotorData, error: promotorError } = await supabaseClient
             .from('users')
             .select('id, name, store_id')
             .eq('role', 'promotor')
+            .eq('status', 'active')
             .in('store_id', storeIds);
 
         if (promotorError) {

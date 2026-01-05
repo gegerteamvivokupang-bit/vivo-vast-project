@@ -51,12 +51,13 @@ export async function GET(
 
     const promotorIds = (promotorHierarchy || []).map(h => h.user_id).filter(Boolean)
 
-    // Get promotor details
+    // Get promotor details (only ACTIVE promotors)
     const { data: promotorUsers } = await supabase
       .from('users')
       .select('id, name, employee_id, role')
       .in('id', promotorIds)
       .eq('role', 'promotor')
+      .eq('status', 'active')
 
     // Get month from query params or use current month (WITA timezone)
     const { searchParams } = new URL(request.url)

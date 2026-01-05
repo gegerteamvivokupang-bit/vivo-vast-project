@@ -85,12 +85,13 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Get promotor details
+    // Get promotor details (only ACTIVE promotors)
     const { data: promotorUsers } = await supabase
       .from('users')
       .select('id, name')
       .in('id', promotorIds)
       .eq('role', 'promotor')
+      .eq('status', 'active')
 
     // Get monthly aggregate data from VIEW
     const { data: aggData } = await supabase

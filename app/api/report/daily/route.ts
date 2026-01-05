@@ -93,12 +93,13 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Get promotor details
+    // Get promotor details (only ACTIVE promotors)
     const { data: promotorUsers } = await supabase
       .from('users')
       .select('id, name')
       .in('id', promotorIds)
       .eq('role', 'promotor')
+      .eq('status', 'active')
 
     // Get daily aggregate data for TODAY
     const { data: dailyData } = await supabase
