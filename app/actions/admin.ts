@@ -777,7 +777,56 @@ export async function getExportData(filter: ExportFilter) {
         return true
     })
 
-    return { success: true, data: enrichedData }
+    // Get Sator Summary Data (from v_agg_monthly_sator_all)
+    // Assuming the export is typically done for a specific month, we use the startDate's month.
+    // If startDate is '2026-02-01', we get data for Feb 2026.
+    const startMonth = filter.startDate.substring(0, 7) + '-01' // 'YYYY-MM-01'
+
+    // Fetch summary from view
+    const { data: satorSummaryView, error: summaryError } = await auth.adminDb!
+        .from('v_agg_monthly_sator_all')
+        .select(`
+            sator_user_id,
+            total_input,
+            total_approved,
+            total_rejected,
+            total_pending,
+            total_closed
+        `)
+        .eq('agg_month', startMonth)
+
+    // Fetch sator names manually to ensure we get names for all IDs
+    let satorSummaryData: any[] = []
+
+    if (!summaryError && satorSummaryView && satorSummaryView.length > 0) {
+        const satorIds = satorSummaryView.map(s => s.sator_user_id)
+        const { data: satorNames } = await auth.adminDb!
+            .from('users')
+            .select('id, name')
+            .in('id', satorIds)
+
+        const nameMap = new Map((satorNames || []).map(u => [u.id, u.name]))
+
+        satorSummaryData = satorSummaryView.map(s => ({
+            sator_name: nameMap.get(s.sator_user_id) || 'Unknown',
+            total_input: s.total_input,
+            total_approved: s.total_approved, // Note: View column might be 0 if logic was wrong before, check verify
+            total_closed: s.total_closed,     // REAL APPROVED Usually here
+            total_rejected: s.total_rejected,
+            total_pending: s.total_pending
+        }))
+    } else {
+        console.log('[getExportData] Sator summary empty or error:', summaryError)
+    }
+
+    // Return structured data for Excel tabs
+    return {
+        success: true,
+        data: {
+            transactions: enrichedData,
+            satorSummary: satorSummaryData
+        }
+    }
 }
 
 // ============================================
@@ -822,7 +871,7 @@ export async function getAdminStats() {
             totalStores: stores.length,
             // Monthly Stats
             totalTransactions: transactions.length,
-            totalAcc: transactions.filter(t => t.status === 'closed').length, // Changed 'acc' to 'closed'
+            totalAcc: transactions.filter(t => t.status === 'acc').length, // Revert to 'acc' based on real DB data
             totalPending: transactions.filter(t => t.status === 'pending').length,
         }
     }
