@@ -777,29 +777,36 @@ export async function getExportData(filter: ExportFilter) {
         return true
     })
 
-    // Get Sator Summary Data (from v_agg_monthly_sator_all)
-    // Assuming the export is typically done for a specific month, we use the startDate's month.
-    // If startDate is '2026-02-01', we get data for Feb 2026.
-    const startMonth = filter.startDate.substring(0, 7) + '-01' // 'YYYY-MM-01'
+    // --- FETCH TARGETS FOR ALL LEVELS ---
+    // Parse year/month from startDate
+    const dateObj = new Date(filter.startDate)
+    const paramYear = dateObj.getFullYear()
+    const paramMonth = dateObj.getMonth() + 1
 
-    // Fetch summary from view
-    const { data: satorSummaryView, error: summaryError } = await auth.adminDb!
-        .from('v_agg_monthly_sator_all')
-        .select(`
-            sator_user_id,
-            total_input,
-            total_approved,
-            total_rejected,
-            total_pending,
-            total_closed
-        `)
-        .eq('agg_month', startMonth)
+    // Get ALL active targets for this period to map efficiently
+    const { data: allTargets } = await auth.adminDb!
+        .from('targets')
+        .select('user_id, target_value')
+        .eq('period_year', paramYear)
+        .eq('period_month', paramMonth)
+        .eq('target_type', 'primary')
 
-    // Fetch sator names manually to ensure we get names for all IDs
+    const targetMap = new Map((allTargets || []).map(t => [t.user_id, t.target_value]))
+
+    // --- SATOR SUMMARY ---
     let satorSummaryData: any[] = []
 
-    if (!summaryError && satorSummaryView && satorSummaryView.length > 0) {
+    // Fetch summary from view
+    const startMonth = filter.startDate.substring(0, 7) + '-01'
+    const { data: satorSummaryView } = await auth.adminDb!
+        .from('v_agg_monthly_sator_all')
+        .select(`sator_user_id, total_input, total_approved, total_rejected, total_pending, total_closed`)
+        .eq('agg_month', startMonth)
+
+    if (satorSummaryView && satorSummaryView.length > 0) {
         const satorIds = satorSummaryView.map(s => s.sator_user_id)
+
+        // Fetch Names
         const { data: satorNames } = await auth.adminDb!
             .from('users')
             .select('id, name')
@@ -807,24 +814,82 @@ export async function getExportData(filter: ExportFilter) {
 
         const nameMap = new Map((satorNames || []).map(u => [u.id, u.name]))
 
-        satorSummaryData = satorSummaryView.map(s => ({
-            sator_name: nameMap.get(s.sator_user_id) || 'Unknown',
-            total_input: s.total_input,
-            total_approved: s.total_approved, // Note: View column might be 0 if logic was wrong before, check verify
-            total_closed: s.total_closed,     // REAL APPROVED Usually here
-            total_rejected: s.total_rejected,
-            total_pending: s.total_pending
-        }))
-    } else {
-        console.log('[getExportData] Sator summary empty or error:', summaryError)
+        satorSummaryData = satorSummaryView.map(s => {
+            const target = targetMap.get(s.sator_user_id) || 0
+            const achievement = target > 0 ? (s.total_input / target) * 100 : 0
+
+            return {
+                sator_id: s.sator_user_id, // Pass ID for name lookup if needed elsewhere
+                sator_name: nameMap.get(s.sator_user_id) || 'Unknown',
+                total_input: s.total_input,
+                target: target,
+                achievement_percentage: achievement.toFixed(2) + '%',
+                total_closed: s.total_closed,
+                total_rejected: s.total_rejected,
+                total_pending: s.total_pending
+            }
+        })
     }
 
-    // Return structured data for Excel tabs
+    // --- PROMOTOR SUMMARY (Inject Target) ---
+    // We already have enrichedData (transactions), but for Promotor Summary in Excel, 
+    // we need to aggregate transactions AND match with Targets.
+    // Let's rely on Frontend aggregation for transactions, BUT we must pass "promotorTargets" map to frontend OR aggregate here.
+    // Better: Return a separate promotorSummary array calculated here for accuracy.
+
+    // 1. Get Promotor Aggregates from View (Faster than manual aggregation)
+    const { data: promotorView } = await auth.adminDb!
+        .from('v_agg_monthly_promoter_all')
+        .select('*')
+        .eq('agg_month', startMonth)
+
+    let promotorSummaryData: any[] = []
+    if (promotorView) {
+        const promIds = promotorView.map(p => p.promoter_user_id)
+        const { data: promNames } = await auth.adminDb!
+            .from('users')
+            .select('id, name, employee_id') // Get employee_id too if needed
+            .in('id', promIds)
+
+        const pNameMap = new Map((promNames || []).map(u => [u.id, u.name]))
+
+        promotorSummaryData = promotorView.map(p => {
+            const target = targetMap.get(p.promoter_user_id) || 0
+            const achievement = target > 0 ? (p.total_input / target) * 100 : 0
+
+            return {
+                promotor_name: pNameMap.get(p.promoter_user_id) || 'Unknown',
+                total_input: p.total_input,
+                target: target,
+                achievement_percentage: achievement.toFixed(2) + '%',
+                total_closed: p.total_closed,
+                total_pending: p.total_pending,
+                total_rejected: p.total_rejected
+            }
+        })
+    }
+
+    // --- AREA SUMMARY ---
+    // Area targets usually sum of team targets. Use stores table to group.
+    // For now, let's keep it handled in frontend or aggregate promotor targets by area?
+    // Let's pass the raw targetMap logic to frontend? NO, better backend.
+
+    // Complex: Area isn't a user, doesn't have ID in targets table directly usually.
+    // We will stick to Sator & Promotor Summaries first as they are critical users.
+    // Area summary can be derived from Promotor Summary if we include 'Area' in it. (Need to join Hierarchy/Store)
+
+    // Enrich Promotor Summary with Area
+    // Get store areas for promoters
+    // ... (To simplify, let's assume Frontend will use the transaction view for Area, 
+    //      OR we pass targets map to frontend to let it calculate Area Target)
+
+    // Return structured data
     return {
         success: true,
         data: {
             transactions: enrichedData,
-            satorSummary: satorSummaryData
+            satorSummary: satorSummaryData,
+            promotorSummary: promotorSummaryData, // New Data
         }
     }
 }
@@ -841,10 +906,11 @@ export async function getAdminStats() {
     const now = new Date()
     const y = now.getFullYear()
     const m = String(now.getMonth() + 1).padStart(2, '0')
-    const startOfMonth = `${y}-${m}-01`
+    const startOfMonth = `${y} - ${m}-01`
     // End of month
     const nextMonth = new Date(y, now.getMonth() + 1, 0)
-    const endOfMonth = `${y}-${m}-${String(nextMonth.getDate()).padStart(2, '0')}`
+    const endOfMonth = `${y} - ${m} - ${String(nextMonth.getDate()).padStart(2, '0')
+        } `
 
     const [usersRes, storesRes, transRes] = await Promise.all([
         auth.adminDb!.from('users').select('id, role, status'),

@@ -77,11 +77,19 @@ export default function ExportPage() {
             // Process Response Data
             // Previous structure: res.data was array of transactions
             // New structure: res.data = { transactions: [], satorSummary: [] }
+            // New structure: res.data = { transactions: [], satorSummary: [], promotorSummary: [] }
 
-            const transactions = res.data.transactions || []
-            const satorSummary = res.data.satorSummary || []
+            // FIX: Type assertion to handle new structure
+            const resData = res.data as any
+            const transactions = resData?.transactions || []
+            const satorSummary = resData?.satorSummary || []
+            const promotorSummary = resData?.promotorSummary || []
 
-            if (transactions.length === 0 && satorSummary.length === 0) {
+            if (!res.success) {
+                throw new Error(res.message || 'Gagal mengambil data')
+            }
+
+            if (transactions.length === 0 && satorSummary.length === 0 && promotorSummary.length === 0) {
                 const errorMsg = `Tidak ada data untuk periode ${startDate} s/d ${endDate}${selectedArea !== 'ALL' ? ` di area ${selectedArea}` : ''}`
                 toast.error(errorMsg, {
                     id: 'export',
@@ -92,14 +100,14 @@ export default function ExportPage() {
                 return
             }
 
-            // Generate Excel with both datasets
-            generateExcel(transactions, satorSummary)
+            // Generate Excel with all datasets
+            generateExcel(transactions, satorSummary, promotorSummary)
 
-            toast.success(`Berhasil export ${transactions.length} data transaksi!`, {
+            toast.success(`Berhasil export data lengkap!`, {
                 id: 'export',
                 description: `Periode: ${startDate} s/d ${endDate} | Area: ${selectedArea}`
             })
-            setSuccess(`Berhasil export ${transactions.length} data`)
+            setSuccess(`Berhasil export ${transactions.length} transaksi`)
         } catch (err: any) {
             toast.error(err.message || 'Terjadi kesalahan', { id: 'export' })
             setError(err.message || 'Terjadi kesalahan')
@@ -108,7 +116,7 @@ export default function ExportPage() {
         setLoading(false)
     }
 
-    const generateExcel = (transactions: any[], satorSummary: any[]) => {
+    const generateExcel = (transactions: any[], satorSummary: any[], promotorSummary: any[]) => {
         const wb = XLSX.utils.book_new()
 
         // Sheet 1: Summary Report
@@ -120,18 +128,19 @@ export default function ExportPage() {
             ['Area', selectedArea],
             ['Total Transaksi', transactions.length],
             ['Total Sator Aktif', satorSummary.length],
+            ['Total Promotor Aktif', promotorSummary.length],
             [],
             ['Status Transaksi', 'Jumlah'],
-            ['ACC (Closed)', transactions.filter(d => d.status === 'acc' || d.status === 'closed').length],
-            ['Pending', transactions.filter(d => d.status === 'pending').length],
-            ['Reject', transactions.filter(d => d.status === 'reject').length],
+            ['ACC (Closed)', transactions.filter((d: any) => d.status === 'acc' || d.status === 'closed').length],
+            ['Pending', transactions.filter((d: any) => d.status === 'pending').length],
+            ['Reject', transactions.filter((d: any) => d.status === 'reject').length],
         ]
         const wsSummary = XLSX.utils.aoa_to_sheet(summaryData)
         XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary')
 
         // Sheet 2: Detail Data Transaksi
         if (transactions.length > 0) {
-            const detailData = transactions.map(row => ({
+            const detailData = transactions.map((row: any) => ({
                 'Tanggal': row.sale_date,
                 'Customer': row.customer_name,
                 'Phone': row.customer_phone,
@@ -147,10 +156,12 @@ export default function ExportPage() {
 
         // Sheet 3: Rekap Sator (Data from View Database - Accurate Dual Role)
         if (satorSummary.length > 0) {
-            const satorData = satorSummary.map(s => ({
+            const satorData = satorSummary.map((s: any) => ({
                 'Nama Sator': s.sator_name,
-                'Total Input': s.total_input,
-                'ACC / Closing': s.total_closed, // or total_approved depending on view column mapping
+                'Total Target': s.target,
+                'Total Pencapaian': s.total_input,
+                '% Achievement': s.achievement_percentage,
+                'ACC / Closing': s.total_closed,
                 'Pending': s.total_pending,
                 'Reject': s.total_rejected
             }))
@@ -158,55 +169,59 @@ export default function ExportPage() {
             XLSX.utils.book_append_sheet(wb, wsSator, 'Rekap Sator')
         }
 
-        // Sheet 4: Rekap per Area (Calculated from transactions)
-        if (transactions.length > 0) {
-            const areaStats = transactions.reduce((acc, row) => {
-                const area = row.area || 'Unknown'
-                if (!acc[area]) {
-                    acc[area] = { total: 0, closed: 0, pending: 0, reject: 0 }
-                }
-                acc[area].total++
-                if (row.status === 'acc' || row.status === 'closed') acc[area].closed++
-                if (row.status === 'pending') acc[area].pending++
-                if (row.status === 'reject') acc[area].reject++
-                return acc
-            }, {} as Record<string, any>)
-
-            const areaData = Object.entries(areaStats).map(([area, stats]: [string, any]) => ({
-                'Area': area,
-                'Total': stats.total,
-                'ACC': stats.closed,
-                'Pending': stats.pending,
-                'Reject': stats.reject,
-            }))
-            const wsArea = XLSX.utils.json_to_sheet(areaData)
-            XLSX.utils.book_append_sheet(wb, wsArea, 'Rekap Area')
-        }
-
-        // Sheet 5: Rekap per Promotor (Calculated from transactions)
-        if (transactions.length > 0) {
-            const promotorStats = transactions.reduce((acc, row) => {
-                const name = row.promoter_name || 'Unknown'
-                if (!acc[name]) {
-                    acc[name] = { area: row.area, total: 0, closed: 0, pending: 0, reject: 0 }
-                }
-                acc[name].total++
-                if (row.status === 'acc' || row.status === 'closed') acc[name].closed++
-                if (row.status === 'pending') acc[name].pending++
-                if (row.status === 'reject') acc[name].reject++
-                return acc
-            }, {} as Record<string, any>)
-
-            const promotorData = Object.entries(promotorStats).map(([name, stats]: [string, any]) => ({
-                'Promotor': name,
-                'Area': stats.area,
-                'Total': stats.total,
-                'ACC': stats.closed,
-                'Pending': stats.pending,
-                'Reject': stats.reject,
+        // Sheet 4: Rekap Promotor (Data calculated in Backend with Targets)
+        if (promotorSummary.length > 0) {
+            const promotorData = promotorSummary.map((p: any) => ({
+                'Nama Promotor': p.promotor_name,
+                // 'Area': p.area, // Backend logic for area missing in prev step, handle later if critical
+                'Total Target': p.target,
+                'Total Pencapaian': p.total_input,
+                '% Achievement': p.achievement_percentage,
+                'ACC': p.total_closed,
+                'Pending': p.total_pending,
+                'Reject': p.total_rejected,
             }))
             const wsPromotor = XLSX.utils.json_to_sheet(promotorData)
             XLSX.utils.book_append_sheet(wb, wsPromotor, 'Rekap Promotor')
+        }
+
+        // Sheet 5: Rekap per Area (Calculated from Promotor Summary + Transactions Area lookup)
+        // Since backend promotor summary didn't include Area yet, let's derive area from transactions map
+        const areaMap = new Map<string, string>() // Promotor Name -> Area
+        transactions.forEach((t: any) => {
+            if (t.promoter_name && t.area) {
+                areaMap.set(t.promoter_name, t.area)
+            }
+        })
+
+        if (promotorSummary.length > 0) {
+            const areaStats = promotorSummary.reduce((acc: any, row: any) => {
+                const area = areaMap.get(row.promotor_name) || 'Unknown'
+                if (!acc[area]) {
+                    acc[area] = { target: 0, total: 0, closed: 0, pending: 0, reject: 0 }
+                }
+                acc[area].target += (row.target || 0)
+                acc[area].total += (row.total_input || 0)
+                acc[area].closed += (row.total_closed || 0)
+                acc[area].pending += (row.total_pending || 0)
+                acc[area].reject += (row.total_rejected || 0)
+                return acc
+            }, {} as Record<string, any>)
+
+            const areaData = Object.entries(areaStats).map(([area, stats]: [string, any]) => {
+                const achievement = stats.target > 0 ? (stats.total / stats.target) * 100 : 0
+                return {
+                    'Area': area,
+                    'Total Target': stats.target,
+                    'Total Pencapaian': stats.total,
+                    '% Achievement': achievement.toFixed(2) + '%',
+                    'ACC': stats.closed,
+                    'Pending': stats.pending,
+                    'Reject': stats.reject,
+                }
+            })
+            const wsArea = XLSX.utils.json_to_sheet(areaData)
+            XLSX.utils.book_append_sheet(wb, wsArea, 'Rekap Area')
         }
 
         // Download File
