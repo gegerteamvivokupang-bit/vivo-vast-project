@@ -1,0 +1,1 @@
+SELECT routine_name FROM information_schema.routines WHERE routine_schema = 'public' AND (routine_name LIKE '%admin%' OR routine_name LIKE '%overall%' OR routine_name LIKE '%company%' OR routine_name LIKE '%dashboard%') ORDER BY routine_name;

@@ -788,10 +788,23 @@ export async function getAdminStats() {
     const auth = await getAdminUser()
     if (auth.error) return { success: false, message: auth.error, data: null }
 
+    // Calculate Current Month Range
+    const now = new Date()
+    const y = now.getFullYear()
+    const m = String(now.getMonth() + 1).padStart(2, '0')
+    const startOfMonth = `${y}-${m}-01`
+    // End of month
+    const nextMonth = new Date(y, now.getMonth() + 1, 0)
+    const endOfMonth = `${y}-${m}-${String(nextMonth.getDate()).padStart(2, '0')}`
+
     const [usersRes, storesRes, transRes] = await Promise.all([
         auth.adminDb!.from('users').select('id, role, status'),
         auth.adminDb!.from('stores').select('id'),
-        auth.adminDb!.from('vast_finance_data_new').select('id, status')
+        // Filter transactions by DATE RANGE (Monthly)
+        auth.adminDb!.from('vast_finance_data_new')
+            .select('id, status')
+            .gte('sale_date', startOfMonth)
+            .lte('sale_date', endOfMonth)
     ])
 
     const users = usersRes.data || []
@@ -807,8 +820,9 @@ export async function getAdminStats() {
             totalSator: users.filter(u => u.role === 'sator').length,
             totalSpv: users.filter(u => u.role === 'spv').length,
             totalStores: stores.length,
+            // Monthly Stats
             totalTransactions: transactions.length,
-            totalAcc: transactions.filter(t => t.status === 'acc').length,
+            totalAcc: transactions.filter(t => t.status === 'closed').length, // Changed 'acc' to 'closed'
             totalPending: transactions.filter(t => t.status === 'pending').length,
         }
     }
