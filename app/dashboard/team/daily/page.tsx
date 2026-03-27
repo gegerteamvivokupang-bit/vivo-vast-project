@@ -11,12 +11,27 @@ import { Calendar, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Shared Types
-import { AggDailyPromoter, FinanceData } from '@/types/api.types';
+import { AggDailyPromoter } from '@/types/api.types';
 
 // Utilities
 import { parseSupabaseError, logError } from '@/lib/errors';
 import { formatDateWITA, getCurrentDateWITA } from '@/lib/date-utils';
 import { formatCurrency } from '@/lib/dashboard-logic';
+
+interface DailySubmission {
+    id: string;
+    customer_name: string;
+    customer_phone: string;
+    sale_date: string;
+    status: string;
+    limit_amount?: number | null;
+    dp_amount?: number | null;
+    tenor?: number | null;
+    pekerjaan?: string | null;
+    penghasilan?: number | null;
+    has_npwp?: boolean | null;
+    image_urls?: string[] | null;
+}
 
 interface SatorWithPromotors {
     user_id: string;
@@ -40,12 +55,12 @@ export default function SpvDailyPage() {
     // Modal states
     const [showModal, setShowModal] = useState(false);
     const [modalPromotor, setModalPromotor] = useState<PromotorWithDetail | null>(null);
-    const [modalSubmissions, setModalSubmissions] = useState<FinanceData[]>([]);
+    const [modalSubmissions, setModalSubmissions] = useState<DailySubmission[]>([]);
     const [modalLoading, setModalLoading] = useState(false);
 
     // Detail modal
     const [showDetailModal, setShowDetailModal] = useState(false);
-    const [selectedSubmission, setSelectedSubmission] = useState<FinanceData | null>(null);
+    const [selectedSubmission, setSelectedSubmission] = useState<DailySubmission | null>(null);
 
     // Date filter
     const [showDatePicker, setShowDatePicker] = useState(false);
@@ -145,7 +160,7 @@ export default function SpvDailyPage() {
         }
     };
 
-    const openSubmissionDetail = (submission: FinanceData) => {
+    const openSubmissionDetail = (submission: DailySubmission) => {
         setSelectedSubmission(submission);
         setShowDetailModal(true);
     };

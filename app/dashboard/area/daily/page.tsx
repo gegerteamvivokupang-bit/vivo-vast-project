@@ -11,12 +11,29 @@ import { ChevronRight, Calendar, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Shared Types
-import { AggDailyPromoter, FinanceData } from '@/types/api.types';
+import { AggDailyPromoter } from '@/types/api.types';
 
 // Utilities
 import { parseSupabaseError, logError } from '@/lib/errors';
 import { formatDateWITA, getCurrentDateWITA } from '@/lib/date-utils';
 import { formatCurrency } from '@/lib/dashboard-logic';
+
+interface DailySubmission {
+    id: string;
+    customer_name: string;
+    customer_phone: string;
+    sale_date: string;
+    status: string;
+    approval_status?: string | null;
+    transaction_status?: string | null;
+    limit_amount?: number | null;
+    dp_amount?: number | null;
+    tenor?: number | null;
+    pekerjaan?: string | null;
+    penghasilan?: number | null;
+    has_npwp?: boolean | null;
+    image_urls?: string[] | null;
+}
 
 interface LocalPromotor extends AggDailyPromoter {
     user_id: string; // Compatibility with legacy API structure
@@ -71,12 +88,12 @@ export default function ManagerDailyPage() {
     // Modal state for promotor list
     const [showModal, setShowModal] = useState(false);
     const [modalPromotor, setModalPromotor] = useState<LocalPromotor | null>(null);
-    const [modalSubmissions, setModalSubmissions] = useState<FinanceData[]>([]);
+    const [modalSubmissions, setModalSubmissions] = useState<DailySubmission[]>([]);
     const [modalLoading, setModalLoading] = useState(false);
 
     // Modal state for submission detail
     const [showDetailModal, setShowDetailModal] = useState(false);
-    const [selectedSubmission, setSelectedSubmission] = useState<FinanceData | null>(null);
+    const [selectedSubmission, setSelectedSubmission] = useState<DailySubmission | null>(null);
 
     // Date filter state
     const [showDatePicker, setShowDatePicker] = useState(false);
@@ -230,7 +247,7 @@ export default function ManagerDailyPage() {
         }
     };
 
-    const openSubmissionDetail = (submission: FinanceData) => {
+    const openSubmissionDetail = (submission: DailySubmission) => {
         setSelectedSubmission(submission);
         setShowDetailModal(true);
     };
