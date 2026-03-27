@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
 import { Loading } from '@/components/ui/loading';
@@ -9,7 +9,6 @@ import BottomSheetSelect from '@/components/ui/BottomSheetSelect';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency, formatDateWithYear, formatRupiah, parseRupiah } from '@/lib/utils/format';
 
@@ -33,6 +32,10 @@ interface PhoneType {
     name: string;
 }
 
+interface HierarchyStoreRow {
+    stores: { name: string } | { name: string }[] | null;
+}
+
 const TENOR_OPTIONS = [3, 6, 9, 12, 24];
 
 export default function PendingPage() {
@@ -54,15 +57,7 @@ export default function PendingPage() {
     const [tenor, setTenor] = useState<number | ''>('');
     const [phoneTypes, setPhoneTypes] = useState<PhoneType[]>([]);
 
-    useEffect(() => {
-        if (user) {
-            fetchPendingList();
-            fetchPhoneTypes();
-            fetchUserStore();
-        }
-    }, [user]);
-
-    const fetchUserStore = async () => {
+    const fetchUserStore = useCallback(async () => {
         try {
             const supabase = createClient();
             if (user?.id) {
@@ -70,19 +65,21 @@ export default function PendingPage() {
                     .from('hierarchy')
                     .select('stores(name)')
                     .eq('user_id', user.id)
-                    .single();
+                    .single<HierarchyStoreRow>();
 
                 if (hierarchyData?.stores) {
-                    const stores = hierarchyData.stores as any;
-                    setUserStoreName(stores?.name || '');
+                    const storeData = Array.isArray(hierarchyData.stores)
+                        ? hierarchyData.stores[0]
+                        : hierarchyData.stores;
+                    setUserStoreName(storeData?.name || '');
                 }
             }
         } catch (err) {
             console.error('Fetch user store error:', err);
         }
-    };
+    }, [user]);
 
-    const fetchPendingList = async () => {
+    const fetchPendingList = useCallback(async () => {
         if (!user?.id) return;
         setLoading(true);
         setError(null);
@@ -111,20 +108,29 @@ export default function PendingPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [user]);
 
-    const fetchPhoneTypes = async () => {
+    const fetchPhoneTypes = useCallback(async () => {
         try {
             const supabase = createClient();
             const { data } = await supabase
                 .from('phone_types')
                 .select('id, name')
+                .eq('is_active', true)
                 .order('name');
             setPhoneTypes(data || []);
         } catch (err) {
             console.error('Fetch phone types error:', err);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        if (user) {
+            fetchPendingList();
+            fetchPhoneTypes();
+            fetchUserStore();
+        }
+    }, [user, fetchPendingList, fetchPhoneTypes, fetchUserStore]);
 
     const openConvertModal = (transaction: PendingTransaction) => {
         setSelectedTransaction(transaction);

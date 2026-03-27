@@ -584,6 +584,105 @@ export default function ExportPage() {
     const totalInput = allPromotors.reduce((s, m) => s + m.total_input, 0);
     const totalClosing = allPromotors.reduce((s, m) => s + m.total_closed, 0);
     const spcUnderperformCount = spcStores.filter(isUnderperform).length;
+    const promotorTotals = allPromotors.reduce((acc, promotor) => ({
+        daily_input: acc.daily_input + (promotor.daily_input || 0),
+        total_input: acc.total_input + promotor.total_input,
+        target: acc.target + (promotor.target || 0),
+        daily_closed: acc.daily_closed + (promotor.daily_closed || 0),
+        total_closed: acc.total_closed + promotor.total_closed,
+        daily_pending: acc.daily_pending + (promotor.daily_pending || 0),
+        total_pending: acc.total_pending + promotor.total_pending,
+        daily_rejected: acc.daily_rejected + (promotor.daily_rejected || 0),
+        total_rejected: acc.total_rejected + promotor.total_rejected,
+    }), {
+        daily_input: 0,
+        total_input: 0,
+        target: 0,
+        daily_closed: 0,
+        total_closed: 0,
+        daily_pending: 0,
+        total_pending: 0,
+        daily_rejected: 0,
+        total_rejected: 0,
+    });
+    const promotorTotalPct = promotorTotals.target > 0
+        ? Math.round((promotorTotals.total_input / promotorTotals.target) * 100)
+        : 0;
+    const satorTotals = sators.reduce((acc, sator) => ({
+        daily_input: acc.daily_input + (sator.daily_input || 0),
+        total_input: acc.total_input + sator.total_input,
+        target: acc.target + (sator.target || 0),
+        daily_closed: acc.daily_closed + (sator.daily_closed || 0),
+        total_closed: acc.total_closed + sator.total_closed,
+        daily_pending: acc.daily_pending + (sator.daily_pending || 0),
+        total_pending: acc.total_pending + sator.total_pending,
+        daily_rejected: acc.daily_rejected + (sator.daily_rejected || 0),
+        total_rejected: acc.total_rejected + sator.total_rejected,
+    }), {
+        daily_input: 0,
+        total_input: 0,
+        target: 0,
+        daily_closed: 0,
+        total_closed: 0,
+        daily_pending: 0,
+        total_pending: 0,
+        daily_rejected: 0,
+        total_rejected: 0,
+    });
+    const satorTotalPct = satorTotals.target > 0
+        ? Math.round((satorTotals.total_input / satorTotals.target) * 100)
+        : 0;
+    const spcPromotorTotals = spcStores.reduce((acc, store) => {
+        (store.promotors || []).forEach(promotor => {
+            acc.target += promotor.target || 0;
+            acc.daily_input += promotor.daily_input || 0;
+            acc.total_input += promotor.total_input || 0;
+            acc.daily_closed += promotor.daily_closed || 0;
+            acc.total_closed += promotor.total_closed || 0;
+            acc.daily_pending += promotor.daily_pending || 0;
+            acc.total_pending += promotor.total_pending || 0;
+            acc.daily_rejected += promotor.daily_rejected || 0;
+            acc.total_rejected += promotor.total_rejected || 0;
+        });
+        return acc;
+    }, {
+        target: 0,
+        daily_input: 0,
+        total_input: 0,
+        daily_closed: 0,
+        total_closed: 0,
+        daily_pending: 0,
+        total_pending: 0,
+        daily_rejected: 0,
+        total_rejected: 0,
+    });
+    const spcPromotorTotalPct = spcPromotorTotals.target > 0
+        ? Math.round((spcPromotorTotals.total_input / spcPromotorTotals.target) * 100)
+        : 0;
+    const spcStoreTotals = spcStores.reduce((acc, store) => ({
+        target: acc.target + (store.target || 0),
+        daily_input: acc.daily_input + (store.daily_input || 0),
+        total_input: acc.total_input + store.total_input,
+        daily_closed: acc.daily_closed + (store.daily_closed || 0),
+        total_closed: acc.total_closed + store.total_closed,
+        daily_pending: acc.daily_pending + (store.daily_pending || 0),
+        total_pending: acc.total_pending + store.total_pending,
+        daily_rejected: acc.daily_rejected + (store.daily_rejected || 0),
+        total_rejected: acc.total_rejected + store.total_rejected,
+    }), {
+        target: 0,
+        daily_input: 0,
+        total_input: 0,
+        daily_closed: 0,
+        total_closed: 0,
+        daily_pending: 0,
+        total_pending: 0,
+        daily_rejected: 0,
+        total_rejected: 0,
+    });
+    const spcStoreTotalPct = spcStoreTotals.target > 0
+        ? Math.round((spcStoreTotals.total_input / spcStoreTotals.target) * 100)
+        : 0;
 
     return (
         <DashboardLayout allowedRoles={['spv', 'sator']}>
@@ -786,6 +885,26 @@ export default function ExportPage() {
                                         );
                                     })}
                                 </tbody>
+                                <tfoot>
+                                    <tr style={{ backgroundColor: '#e2e8f0', borderTop: '2px solid #94a3b8' }}>
+                                        <td style={{ padding: '8px', fontWeight: 'bold', color: '#1e293b' }}>TOTAL</td>
+                                        <td style={{ padding: '8px', textAlign: 'center', fontFamily: 'monospace', color: '#3b82f6', fontWeight: 'bold' }}>
+                                            {satorTotals.daily_input}/{satorTotals.total_input}/{satorTotals.target}
+                                        </td>
+                                        <td style={{ padding: '8px', textAlign: 'center', fontFamily: 'monospace', color: '#10b981', fontWeight: 'bold' }}>
+                                            {satorTotals.daily_closed}/{satorTotals.total_closed}
+                                        </td>
+                                        <td style={{ padding: '8px', textAlign: 'center', fontFamily: 'monospace', color: '#f59e0b', fontWeight: 'bold' }}>
+                                            {satorTotals.daily_pending}/{satorTotals.total_pending}
+                                        </td>
+                                        <td style={{ padding: '8px', textAlign: 'center', fontFamily: 'monospace', color: '#ef4444', fontWeight: 'bold' }}>
+                                            {satorTotals.daily_rejected}/{satorTotals.total_rejected}
+                                        </td>
+                                        <td style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold', color: satorTotalPct >= timeGonePercent ? '#10b981' : '#ef4444' }}>
+                                            {satorTotalPct}%
+                                        </td>
+                                    </tr>
+                                </tfoot>
                             </table>
                         </div>
                     )}
@@ -830,6 +949,26 @@ export default function ExportPage() {
                                         )
                                     })}
                                 </tbody>
+                                <tfoot>
+                                    <tr style={{ backgroundColor: '#ede9fe', borderTop: '2px solid #c4b5fd' }}>
+                                        <td style={{ padding: '6px', fontWeight: 'bold', color: '#5b21b6' }}>TOTAL</td>
+                                        <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#3b82f6', fontWeight: 'bold' }}>
+                                            {promotorTotals.daily_input}/{promotorTotals.total_input}/{promotorTotals.target}
+                                        </td>
+                                        <td style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold', color: promotorTotalPct >= timeGonePercent ? '#10b981' : '#ef4444' }}>
+                                            {promotorTotalPct}%
+                                        </td>
+                                        <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#10b981', fontWeight: 'bold' }}>
+                                            {promotorTotals.daily_closed}/{promotorTotals.total_closed}
+                                        </td>
+                                        <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#f59e0b', fontWeight: 'bold' }}>
+                                            {promotorTotals.daily_pending}/{promotorTotals.total_pending}
+                                        </td>
+                                        <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#ef4444', fontWeight: 'bold' }}>
+                                            {promotorTotals.daily_rejected}/{promotorTotals.total_rejected}
+                                        </td>
+                                    </tr>
+                                </tfoot>
                             </table>
                             {/* Underperform Table Attached if needed, or separate? For now separate in Excel, combined here if requested, but user asked for simple split. I will add Underperform List to Promotor Image if needed, but let's keep it simple focused on Performance list as per request "Sator Performance and Promotor Performance" */}
                         </div>
@@ -882,6 +1021,25 @@ export default function ExportPage() {
                                             );
                                         })}
                                     </tbody>
+                                    <tfoot>
+                                        <tr style={{ backgroundColor: '#ede9fe', borderTop: '2px solid #c4b5fd' }}>
+                                            <td style={{ padding: '6px', fontWeight: 'bold', color: '#5b21b6' }}>TOTAL</td>
+                                            <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#64748b', fontWeight: 'bold' }}>{spcStoreTotals.target}</td>
+                                            <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#7c3aed', fontWeight: 'bold' }}>
+                                                {spcStoreTotals.daily_input}/{spcStoreTotals.total_input}
+                                            </td>
+                                            <td style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold', color: spcStoreTotalPct >= timeGonePercent ? '#10b981' : '#ef4444' }}>{spcStoreTotalPct}%</td>
+                                            <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#10b981', fontWeight: 'bold' }}>
+                                                {spcStoreTotals.daily_closed}/{spcStoreTotals.total_closed}
+                                            </td>
+                                            <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#f59e0b', fontWeight: 'bold' }}>
+                                                {spcStoreTotals.daily_pending}/{spcStoreTotals.total_pending}
+                                            </td>
+                                            <td style={{ padding: '6px', textAlign: 'center', fontFamily: 'monospace', color: '#ef4444', fontWeight: 'bold' }}>
+                                                {spcStoreTotals.daily_rejected}/{spcStoreTotals.total_rejected}
+                                            </td>
+                                        </tr>
+                                    </tfoot>
                                 </table>
                             </div>
 
@@ -928,6 +1086,27 @@ export default function ExportPage() {
                                             });
                                         })}
                                     </tbody>
+                                    <tfoot>
+                                        <tr style={{ backgroundColor: '#ede9fe', borderTop: '2px solid #c4b5fd' }}>
+                                            <td colSpan={2} style={{ padding: '5px', fontWeight: 'bold', color: '#5b21b6' }}>TOTAL</td>
+                                            <td style={{ padding: '5px', textAlign: 'center', fontFamily: 'monospace', color: '#64748b', fontWeight: 'bold' }}>{spcPromotorTotals.target}</td>
+                                            <td style={{ padding: '5px', textAlign: 'center', fontFamily: 'monospace', color: '#7c3aed', fontWeight: 'bold' }}>
+                                                {spcPromotorTotals.daily_input}/{spcPromotorTotals.total_input}
+                                            </td>
+                                            <td style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold', color: spcPromotorTotalPct >= timeGonePercent ? '#10b981' : '#ef4444' }}>
+                                                {spcPromotorTotalPct}%
+                                            </td>
+                                            <td style={{ padding: '5px', textAlign: 'center', fontFamily: 'monospace', color: '#10b981', fontWeight: 'bold' }}>
+                                                {spcPromotorTotals.daily_closed}/{spcPromotorTotals.total_closed}
+                                            </td>
+                                            <td style={{ padding: '5px', textAlign: 'center', fontFamily: 'monospace', color: '#f59e0b', fontWeight: 'bold' }}>
+                                                {spcPromotorTotals.daily_pending}/{spcPromotorTotals.total_pending}
+                                            </td>
+                                            <td style={{ padding: '5px', textAlign: 'center', fontFamily: 'monospace', color: '#ef4444', fontWeight: 'bold' }}>
+                                                {spcPromotorTotals.daily_rejected}/{spcPromotorTotals.total_rejected}
+                                            </td>
+                                        </tr>
+                                    </tfoot>
                                 </table>
                             </div>
 

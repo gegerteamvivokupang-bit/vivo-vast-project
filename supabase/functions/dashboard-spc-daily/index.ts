@@ -93,47 +93,80 @@ Deno.serve(async (req) => {
 
         console.log('SPC Daily - userId:', userId, 'date:', targetDate);
 
-        // Query dari view v_agg_daily_store_all
-        const { data: spcData, error: spcError } = await supabaseClient
-            .from('v_agg_daily_store_all')
-            .select('*')
+        // Always start from store master so SPC stores with zero input still appear
+        const { data: spcStores, error: spcStoresError } = await supabaseClient
+            .from('stores')
+            .select('id, name, area')
             .eq('is_spc', true)
-            .or(`agg_date.eq.${targetDate},agg_date.is.null`);
+            .order('name');
 
-        if (spcError) {
-            console.error('SPC query error:', spcError);
+        if (spcStoresError) {
+            console.error('SPC stores query error:', spcStoresError);
             return new Response(
-                JSON.stringify({ success: false, message: 'Failed to fetch SPC data: ' + spcError.message }),
+                JSON.stringify({ success: false, message: 'Failed to fetch SPC stores: ' + spcStoresError.message }),
                 { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
         }
 
-        // Group by store_id (karena bisa ada null dan data)
-        const storeMap = new Map<string, any>();
-        for (const row of (spcData || [])) {
-            const existing = storeMap.get(row.store_id);
-            // Prioritaskan yang punya agg_date (bukan null)
-            if (!existing || (row.agg_date && !existing.agg_date)) {
-                storeMap.set(row.store_id, row);
-            }
+        const storeIds = (spcStores || []).map(store => store.id);
+
+        // Query current day aggregate only, then merge into store master list
+        const { data: spcAggData, error: spcAggError } = await supabaseClient
+            .from('agg_daily_store')
+            .select('store_id, agg_date, total_input, total_closed, total_pending, total_rejected, total_closing_direct, total_closing_followup')
+            .in('store_id', storeIds.length > 0 ? storeIds : ['00000000-0000-0000-0000-000000000000'])
+            .eq('agg_date', targetDate);
+
+        if (spcAggError) {
+            console.error('SPC aggregate query error:', spcAggError);
+            return new Response(
+                JSON.stringify({ success: false, message: 'Failed to fetch SPC aggregate data: ' + spcAggError.message }),
+                { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
         }
 
-        // Get all store IDs
-        const storeIds = Array.from(storeMap.keys());
+        const storeAggMap = new Map<string, any>();
+        (spcAggData || []).forEach(row => {
+            storeAggMap.set(row.store_id, row);
+        });
 
-        // Query all promotors in SPC stores (only ACTIVE)
+        // Query promotor-store assignment from hierarchy because admin assignment is maintained there
+        const { data: hierarchyData, error: hierarchyError } = await supabaseClient
+            .from('hierarchy')
+            .select('user_id, store_id')
+            .in('store_id', storeIds);
+
+        if (hierarchyError) {
+            console.error('Hierarchy query error:', hierarchyError);
+        }
+
+        const hierarchyRows = hierarchyData || [];
+        const promotorIdsFromHierarchy = hierarchyRows.map(h => h.user_id).filter(Boolean);
+
+        // Query all ACTIVE promotors in SPC stores
         const { data: promotorData, error: promotorError } = await supabaseClient
             .from('users')
-            .select('id, name, store_id')
+            .select('id, name')
             .eq('role', 'promotor')
             .eq('status', 'active')
-            .in('store_id', storeIds);
+            .in('id', promotorIdsFromHierarchy.length > 0 ? promotorIdsFromHierarchy : ['00000000-0000-0000-0000-000000000000']);
 
         if (promotorError) {
             console.error('Promotor query error:', promotorError);
         }
 
-        const promotors = promotorData || [];
+        const promotorStoreMap = new Map<string, string>();
+        hierarchyRows.forEach(h => {
+            if (h.user_id && h.store_id) {
+                promotorStoreMap.set(h.user_id, h.store_id);
+            }
+        });
+
+        const promotors = (promotorData || []).map(p => ({
+            id: p.id,
+            name: p.name,
+            store_id: promotorStoreMap.get(p.id) || null
+        }));
         const promotorIds = promotors.map(p => p.id);
 
         // Query targets for all promotors (untuk bulan dari targetDate)
@@ -182,9 +215,10 @@ Deno.serve(async (req) => {
         });
 
         // Map promotors to stores and calculate store targets
-        const result = Array.from(storeMap.values()).map(row => {
+        const result = (spcStores || []).map(store => {
+            const aggRow = storeAggMap.get(store.id);
             const storePromotors = promotors
-                .filter(p => p.store_id === row.store_id)
+                .filter(p => p.store_id === store.id)
                 .map(p => {
                     const agg = aggPromotorMap.get(p.id) || { total_input: 0, total_closed: 0, total_pending: 0, total_rejected: 0 };
                     const target = targetMap.get(p.id) || 0;
@@ -203,18 +237,18 @@ Deno.serve(async (req) => {
             const storeTarget = storePromotors.reduce((sum, p) => sum + (p.target || 0), 0);
 
             return {
-                store_id: row.store_id,
-                store_name: row.store_name,
-                store_code: row.store_code || '',
-                area: row.area,
+                store_id: store.id,
+                store_name: store.name,
+                store_code: '',
+                area: store.area,
                 target: storeTarget,
-                total_input: row.total_input || 0,
-                total_closed: row.total_closed || 0,
-                total_pending: row.total_pending || 0,
-                total_rejected: row.total_rejected || 0,
-                total_closing_direct: row.total_closing_direct || 0,
-                total_closing_followup: row.total_closing_followup || 0,
-                agg_date: row.agg_date || targetDate,
+                total_input: aggRow?.total_input || 0,
+                total_closed: aggRow?.total_closed || 0,
+                total_pending: aggRow?.total_pending || 0,
+                total_rejected: aggRow?.total_rejected || 0,
+                total_closing_direct: aggRow?.total_closing_direct || 0,
+                total_closing_followup: aggRow?.total_closing_followup || 0,
+                agg_date: aggRow?.agg_date || targetDate,
                 promotors: storePromotors
             };
         });

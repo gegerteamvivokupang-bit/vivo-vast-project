@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
@@ -36,11 +36,6 @@ const STATUS_OPTIONS = [
     { value: 'Reject', label: 'Reject (Ditolak)', color: 'red' },
 ];
 
-interface Store {
-    id: string;
-    name: string;
-}
-
 interface PhoneType {
     id: string;
     name: string;
@@ -55,7 +50,6 @@ export default function InputPage() {
     const [success, setSuccess] = useState(false);
 
     // Reference data
-    const [stores, setStores] = useState<Store[]>([]);
     const [phoneTypes, setPhoneTypes] = useState<PhoneType[]>([]);
     const [userStoreName, setUserStoreName] = useState<string>('');
 
@@ -75,44 +69,30 @@ export default function InputPage() {
     // Combined images (KTP + proof)
     const [imageUrls, setImageUrls] = useState<string[]>([]);
 
-    useEffect(() => {
-        if (user) {
-            fetchReferenceData();
-        }
-    }, [user]);
-
-    const fetchReferenceData = async () => {
+    const fetchReferenceData = useCallback(async () => {
+        if (!user) return;
         setLoading(true);
         try {
             const supabase = createClient();
 
             // Fetch user's store from hierarchy
-            if (user?.id) {
-                const { data: hierarchyData } = await supabase
-                    .from('hierarchy')
-                    .select('store_id, stores(id, name)')
-                    .eq('user_id', user.id)
-                    .single();
+            const { data: hierarchyData } = await supabase
+                .from('hierarchy')
+                .select('store_id, stores(id, name)')
+                .eq('user_id', user.id)
+                .single();
 
-                if (hierarchyData?.store_id) {
-                    setStoreId(hierarchyData.store_id);
-                    const storeData = hierarchyData.stores as unknown as { id: string; name: string } | null;
-                    setUserStoreName(storeData?.name || 'Unknown Store');
-                }
+            if (hierarchyData?.store_id) {
+                setStoreId(hierarchyData.store_id);
+                const storeData = hierarchyData.stores as unknown as { id: string; name: string } | null;
+                setUserStoreName(storeData?.name || 'Unknown Store');
             }
-
-            // Fetch all stores (for fallback/admin)
-            const { data: storesData } = await supabase
-                .from('stores')
-                .select('id, name')
-                .order('name');
-
-            setStores(storesData || []);
 
             // Fetch phone types
             const { data: phoneTypesData, error: phoneTypesError } = await supabase
                 .from('phone_types')
                 .select('id, name')
+                .eq('is_active', true)
                 .order('name');
 
             if (phoneTypesError) {
@@ -129,7 +109,13 @@ export default function InputPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [user]);
+
+    useEffect(() => {
+        if (user) {
+            fetchReferenceData();
+        }
+    }, [user, fetchReferenceData]);
 
     const handleLimitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setLimitAmount(formatRupiah(e.target.value));

@@ -1,6 +1,5 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
 import { getAdminUser } from './admin'
 
 export interface TargetUser {
@@ -22,12 +21,29 @@ export interface TargetValidation {
     warnings: string[]
 }
 
+type TargetListUser = {
+    id: string
+    name: string
+    role: string
+}
+
+type TargetRecord = {
+    user_id: string
+    period_month: number
+    period_year: number
+    month: string
+    target_value: number
+    target_type: 'primary' | 'as_sator'
+    set_by_admin_id: string
+    updated_at: string
+}
+
 // Get target list for specific role
 export async function getTargetList(role: 'spv' | 'sator' | 'promotor', periodMonth: number, periodYear: number) {
     const auth = await getAdminUser()
     if (auth.error) return { success: false, message: auth.error, data: [] }
 
-    let users: any[] = []
+    let users: TargetListUser[] = []
 
     if (role === 'sator') {
         // For Sator: Include both actual Sator AND SPV who have promotor directly
@@ -229,7 +245,7 @@ export async function validateHierarchicalTargets(
         }
     })
 
-    // Validate: SUM(Sator targets) >= SPV target
+    // Warning only: SUM(Sator targets) compared with SPV target
     // Note: satorTargets already includes dual-role SPV (from getTargetList)
     spvTargets.forEach(spv => {
         // Get all Sators under this SPV (including the SPV itself if dual role)
@@ -246,9 +262,9 @@ export async function validateHierarchicalTargets(
         }
 
         if (totalSatorTarget < spv.new_target) {
-            errors.push(
+            warnings.push(
                 `SPV "${spv.name}": Target (${spv.new_target}) > Total target Sator (${totalSatorTarget}). ` +
-                `Total target Sator harus ≥ ${spv.new_target}`
+                `Sistem tetap mengizinkan simpan.`
             )
         }
     })
@@ -264,21 +280,21 @@ export async function validateHierarchicalTargets(
         }
     })
 
-    // Validate: SUM(Promotor targets) >= Sator target
+    // Warning only: SUM(Promotor targets) compared with Sator target
     satorTargets.forEach(sator => {
         const promotors = promotorBySator.get(sator.user_id) || []
         const totalPromotorTarget = promotors.reduce((sum, p) => sum + p.new_target, 0)
 
         if (totalPromotorTarget < sator.new_target) {
-            errors.push(
+            warnings.push(
                 `Sator "${sator.name}": Target (${sator.new_target}) > Total target Promotor (${totalPromotorTarget}). ` +
-                `Total target Promotor harus ≥ ${sator.new_target}`
+                `Sistem tetap mengizinkan simpan.`
             )
         }
     })
 
     return {
-        isValid: errors.length === 0,
+        isValid: true,
         errors,
         warnings
     }
@@ -294,7 +310,7 @@ export async function saveTargets(
     const auth = await getAdminUser()
     if (auth.error) return { success: false, message: auth.error }
 
-    const records: any[] = []
+    const records: TargetRecord[] = []
 
     targets.forEach(t => {
         // For all users: save primary target if changed

@@ -142,6 +142,24 @@ export default function AdminDashboardPage() {
                             </Card>
                         </Link>
 
+                        {/* Product Type Management */}
+                        <Link href="/admin/products" className="block">
+                            <Card className="hover:bg-muted/50 transition-colors">
+                                <CardContent className="p-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-rose-100 dark:bg-rose-900/30 rounded-xl flex items-center justify-center text-xl">
+                                            <span>P</span>
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className="font-semibold text-foreground">Tipe Produk</div>
+                                            <div className="text-xs text-muted-foreground">Tambah, edit, nonaktifkan, hapus tipe produk</div>
+                                        </div>
+                                        <span className="text-muted-foreground">{'>'}</span>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </Link>
+
                         {/* Data Export */}
                         <Link href="/admin/export" className="block">
                             <Card className="hover:bg-muted/50 transition-colors">
@@ -186,6 +204,7 @@ export default function AdminDashboardPage() {
                         <h4 className="font-semibold text-sm mb-2">Catatan Admin</h4>
                         <ul className="text-xs text-muted-foreground space-y-1">
                             <li>- Admin dapat mengelola data master (Users, Stores)</li>
+                            <li>- Admin dapat mengelola master tipe produk yang tampil di form input</li>
                             <li>- Admin dapat mengatur target untuk SPV, Sator, dan Promotor</li>
                             <li>- Admin TIDAK dapat input sales langsung</li>
                             <li>- Semua aksi admin dicatat dalam audit log</li>

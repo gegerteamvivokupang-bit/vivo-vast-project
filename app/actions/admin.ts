@@ -336,6 +336,7 @@ export async function createUser(data: CreateUserData) {
             role: data.role,
             status: 'active',
             pin_hash: data.pin,
+            store_id: data.role === 'promotor' ? (data.store_id || null) : null,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
         })
@@ -484,6 +485,22 @@ export async function updateUserHierarchy(userId: string, data: UpdateHierarchyD
     if (error) {
         console.error('[updateUserHierarchy] Error:', error)
         return { success: false, message: error.message }
+    }
+
+    // Keep users.store_id in sync for promotor because some legacy dashboards still read from users
+    if (userData.role === 'promotor' && data.store_id !== undefined) {
+        const { error: syncError } = await auth.adminDb!
+            .from('users')
+            .update({
+                store_id: data.store_id || null,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', userId)
+
+        if (syncError) {
+            console.error('[updateUserHierarchy] Failed to sync users.store_id:', syncError)
+            return { success: false, message: 'Hierarchy berhasil diupdate, tetapi sinkronisasi store user gagal: ' + syncError.message }
+        }
     }
 
     return { success: true }
@@ -698,6 +715,194 @@ export async function deleteStore(storeId: string) {
     }
 
     return { success: true, message: `Toko "${storeData.name}" berhasil dihapus` }
+}
+
+// ============================================
+// PRODUCT MANAGEMENT
+// ============================================
+
+export interface ProductFilter {
+    search?: string
+    status?: 'all' | 'active' | 'inactive'
+}
+
+export interface CreateProductData {
+    name: string
+    is_active?: boolean
+}
+
+export async function getProducts(filter: ProductFilter = {}) {
+    const auth = await getAdminUser()
+    if (auth.error) return { success: false, message: auth.error, data: [] }
+
+    let query = auth.adminDb!
+        .from('phone_types')
+        .select('id, name, is_active, created_at')
+        .order('name', { ascending: true })
+
+    if (filter.search) {
+        query = query.ilike('name', `%${filter.search}%`)
+    }
+
+    if (filter.status && filter.status !== 'all') {
+        query = query.eq('is_active', filter.status === 'active')
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+        console.error('[getProducts] Error:', error)
+        return { success: false, message: error.message, data: [] }
+    }
+
+    return { success: true, data: data || [] }
+}
+
+export async function createProduct(data: CreateProductData) {
+    const auth = await getAdminUser()
+    if (auth.error) return { success: false, message: auth.error }
+
+    const normalizedName = data.name.trim().toUpperCase()
+    if (!normalizedName) {
+        return { success: false, message: 'Nama produk wajib diisi' }
+    }
+
+    const { data: existing } = await auth.adminDb!
+        .from('phone_types')
+        .select('id, name')
+        .ilike('name', normalizedName)
+        .limit(1)
+
+    if (existing && existing.length > 0) {
+        return { success: false, message: `Produk "${existing[0].name}" sudah ada` }
+    }
+
+    const { error } = await auth.adminDb!
+        .from('phone_types')
+        .insert({
+            name: normalizedName,
+            is_active: data.is_active ?? true
+        })
+
+    if (error) {
+        console.error('[createProduct] Error:', error)
+        return { success: false, message: error.message }
+    }
+
+    return { success: true, message: `Produk "${normalizedName}" berhasil ditambahkan` }
+}
+
+export async function updateProduct(productId: string, data: Partial<CreateProductData>) {
+    const auth = await getAdminUser()
+    if (auth.error) return { success: false, message: auth.error }
+
+    const updateData: Partial<CreateProductData> = {}
+    if (typeof data.name === 'string') {
+        const normalizedName = data.name.trim().toUpperCase()
+        if (!normalizedName) {
+            return { success: false, message: 'Nama produk wajib diisi' }
+        }
+
+        const { data: existing } = await auth.adminDb!
+            .from('phone_types')
+            .select('id, name')
+            .ilike('name', normalizedName)
+            .neq('id', productId)
+            .limit(1)
+
+        if (existing && existing.length > 0) {
+            return { success: false, message: `Produk "${existing[0].name}" sudah ada` }
+        }
+
+        updateData.name = normalizedName
+    }
+
+    if (typeof data.is_active === 'boolean') {
+        updateData.is_active = data.is_active
+    }
+
+    const { error } = await auth.adminDb!
+        .from('phone_types')
+        .update(updateData)
+        .eq('id', productId)
+
+    if (error) {
+        console.error('[updateProduct] Error:', error)
+        return { success: false, message: error.message }
+    }
+
+    return { success: true, message: 'Produk berhasil diperbarui' }
+}
+
+export async function toggleProductStatus(productId: string) {
+    const auth = await getAdminUser()
+    if (auth.error) return { success: false, message: auth.error }
+
+    const { data: product, error: fetchError } = await auth.adminDb!
+        .from('phone_types')
+        .select('id, name, is_active')
+        .eq('id', productId)
+        .single()
+
+    if (fetchError || !product) {
+        return { success: false, message: 'Produk tidak ditemukan' }
+    }
+
+    const nextStatus = !product.is_active
+    const { error } = await auth.adminDb!
+        .from('phone_types')
+        .update({ is_active: nextStatus })
+        .eq('id', productId)
+
+    if (error) {
+        console.error('[toggleProductStatus] Error:', error)
+        return { success: false, message: error.message }
+    }
+
+    return {
+        success: true,
+        message: `Produk "${product.name}" berhasil ${nextStatus ? 'diaktifkan' : 'dinonaktifkan'}`
+    }
+}
+
+export async function deleteProduct(productId: string) {
+    const auth = await getAdminUser()
+    if (auth.error) return { success: false, message: auth.error }
+
+    const { data: product, error: productError } = await auth.adminDb!
+        .from('phone_types')
+        .select('id, name')
+        .eq('id', productId)
+        .single()
+
+    if (productError || !product) {
+        return { success: false, message: 'Produk tidak ditemukan' }
+    }
+
+    const { count } = await auth.adminDb!
+        .from('vast_finance_data_new')
+        .select('id', { count: 'exact', head: true })
+        .eq('phone_type_id', productId)
+        .limit(1)
+
+    if (count && count > 0) {
+        return {
+            success: false,
+            message: `Produk "${product.name}" tidak dapat dihapus karena sudah dipakai di ${count} transaksi. Nonaktifkan produk jika sudah tidak dipakai lagi.`
+        }
+    }
+
+    const { error } = await auth.adminDb!
+        .from('phone_types')
+        .delete()
+        .eq('id', productId)
+
+    if (error) {
+        console.error('[deleteProduct] Error:', error)
+        return { success: false, message: error.message }
+    }
+
+    return { success: true, message: `Produk "${product.name}" berhasil dihapus` }
 }
 
 // ============================================

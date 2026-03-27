@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, use } from 'react'
+import { useCallback, useEffect, useState, use } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { Toaster } from 'sonner'
@@ -54,11 +54,12 @@ export default function AdminTargetEditorPage({ params }: Props) {
     const periodLabel = periodDate.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
 
 
-    useEffect(() => {
-        loadAllTargets()
-    }, [])
+    type CopyTargetItem = {
+        user_id: string
+        target_value: number
+    }
 
-    const loadAllTargets = async () => {
+    const loadAllTargets = useCallback(async () => {
         setLoading(true)
         toast.loading('Memuat data target...', { id: 'load' })
 
@@ -73,8 +74,12 @@ export default function AdminTargetEditorPage({ params }: Props) {
             if (satorRes.success) setSatorTargets(satorRes.data as TargetUser[])
             if (promotorRes.success) setPromotorTargets(promotorRes.data as TargetUser[])
 
-            const allUsers = [...(spvRes.data || []), ...(satorRes.data || []), ...(promotorRes.data || [])]
-            const uniqueAreas = [...new Set(allUsers.map((u: any) => u.area).filter(Boolean))] as string[]
+            const allUsers = [
+                ...((spvRes.data as TargetUser[] | undefined) || []),
+                ...((satorRes.data as TargetUser[] | undefined) || []),
+                ...((promotorRes.data as TargetUser[] | undefined) || [])
+            ]
+            const uniqueAreas = [...new Set(allUsers.map((u) => u.area).filter((area): area is string => Boolean(area)))]
             setAreas(uniqueAreas.sort())
 
             // If no total targets set at all, auto enter edit mode
@@ -86,12 +91,17 @@ export default function AdminTargetEditorPage({ params }: Props) {
             }
 
             toast.success('Data berhasil dimuat', { id: 'load' })
-        } catch (error: any) {
-            toast.error('Gagal memuat data: ' + error.message, { id: 'load' })
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error'
+            toast.error('Gagal memuat data: ' + message, { id: 'load' })
         } finally {
             setLoading(false)
         }
-    }
+    }, [periodMonth, periodYear])
+
+    useEffect(() => {
+        loadAllTargets()
+    }, [loadAllTargets])
 
     const handleCopyFromPreviousMonth = async () => {
         if (!confirm(`Copy target dari bulan sebelumnya?\n\nTarget yang sudah ada akan ditimpa.`)) return
@@ -104,8 +114,8 @@ export default function AdminTargetEditorPage({ params }: Props) {
             return
         }
 
-        const copiedTargets = res.data || []
-        const targetMap = new Map(copiedTargets.map((t: any) => [t.user_id, t.target_value]))
+        const copiedTargets = (res.data || []) as CopyTargetItem[]
+        const targetMap = new Map(copiedTargets.map((t) => [t.user_id, t.target_value]))
 
         setSpvTargets(prev => prev.map(u => ({ ...u, new_target: targetMap.get(u.user_id) || u.new_target })))
         setSatorTargets(prev => prev.map(u => ({ ...u, new_target: targetMap.get(u.user_id) || u.new_target })))
@@ -132,13 +142,19 @@ export default function AdminTargetEditorPage({ params }: Props) {
 
         const validation = await validateHierarchicalTargets(spvTargets, satorTargets, promotorTargets)
 
-        if (!validation.isValid) {
-            toast.error('Validasi gagal!', { id: 'save' })
-            validation.errors.forEach((err, i) => {
-                setTimeout(() => toast.error(err, { duration: 8000 }), i * 100)
+        if (validation.warnings.length > 0) {
+            toast.warning('Ada warning hierarki target, data tetap akan disimpan', {
+                id: 'save',
+                duration: 5000
             })
-            setSaving(false)
-            return
+            validation.warnings.forEach((warning, i) => {
+                setTimeout(() => toast.warning(warning, { duration: 8000 }), i * 150)
+            })
+        } else if (validation.errors.length > 0) {
+            toast.error('Validasi target bermasalah', { id: 'save' })
+            validation.errors.forEach((err, i) => {
+                setTimeout(() => toast.error(err, { duration: 8000 }), i * 150)
+            })
         }
 
         // FIX: For dual-role SPV, sync the new_target from satorTargets to new_target_as_sator
@@ -198,7 +214,7 @@ export default function AdminTargetEditorPage({ params }: Props) {
     })
 
     // Sort promotors within each sator group
-    promotorsBySator.forEach((promotors, satorId) => {
+    promotorsBySator.forEach((promotors) => {
         promotors.sort((a, b) => a.name.localeCompare(b.name))
     })
 
@@ -516,7 +532,7 @@ export default function AdminTargetEditorPage({ params }: Props) {
                     {/* Info */}
                     <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200">
                         <CardContent className="p-4 text-xs text-blue-800 dark:text-blue-300">
-                            <strong>💡 Tips:</strong> Total target bawahan harus ≥ target atasan • Bulk Set: ketik angka lalu Enter
+                            <strong>💡 Tips:</strong> Jika total target bawahan lebih kecil dari target atasan, sistem hanya memberi warning dan tetap mengizinkan simpan • Bulk Set: ketik angka lalu Enter
                         </CardContent>
                     </Card>
                 </div>

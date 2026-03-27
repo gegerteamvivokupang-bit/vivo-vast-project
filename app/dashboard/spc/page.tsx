@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
@@ -89,13 +89,7 @@ export default function SPCDashboardPage() {
         }
     }, [user, router]);
 
-    useEffect(() => {
-        if (user && canAccessSPC(user)) {
-            fetchData();
-        }
-    }, [user, viewMode, selectedDate]);
-
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         setLoading(true);
         setError(null);
 
@@ -139,7 +133,13 @@ export default function SPCDashboardPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [selectedDate, user, viewMode]);
+
+    useEffect(() => {
+        if (user && canAccessSPC(user)) {
+            fetchData();
+        }
+    }, [fetchData, user]);
 
     // Navigation functions
     const goToPrev = () => {
@@ -199,11 +199,20 @@ export default function SPCDashboardPage() {
             total_input: store.total_input,
             target: store.target || 0,
             user_id: store.store_id // dummy for type compliance?
-        } as any;
+        } as PromotorData;
         return isUnderperform(pData, timeGonePercent);
     };
 
     const totalPercent = calculateAchievement(totals.input, totals.target);
+    const sortedStores = [...stores].sort((a, b) => b.total_input - a.total_input);
+    const tableTotals = sortedStores.reduce((acc, store) => ({
+        target: acc.target + (store.target || 0),
+        input: acc.input + store.total_input,
+        closed: acc.closed + store.total_closed,
+        pending: acc.pending + store.total_pending,
+        rejected: acc.rejected + store.total_rejected,
+    }), { target: 0, input: 0, closed: 0, pending: 0, rejected: 0 });
+    const totalTablePercent = calculateAchievement(tableTotals.input, tableTotals.target);
 
     // Period label untuk export
     const periodLabel = viewMode === 'daily'
@@ -437,9 +446,7 @@ export default function SPCDashboardPage() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-border">
-                                        {stores
-                                            .sort((a, b) => b.total_input - a.total_input)
-                                            .map((store) => {
+                                        {sortedStores.map((store) => {
                                                 const pct = calculateAchievement(store.total_input, store.target || 0);
                                                 const under = checkStoreUnderperform(store);
 
@@ -489,6 +496,24 @@ export default function SPCDashboardPage() {
                                                 );
                                             })}
                                     </tbody>
+                                    <tfoot className="border-t-2 border-border bg-muted/40">
+                                        <tr>
+                                            <td className="sticky left-0 z-10 bg-muted/40 py-2 pl-3 pr-1">
+                                                <span className="font-bold text-[11px] text-foreground">Total</span>
+                                            </td>
+                                            <td className="px-1 py-2 text-center font-bold text-[10px]">{tableTotals.target}</td>
+                                            <td className="px-1 py-2 text-center font-bold text-[11px] text-primary">{tableTotals.input}</td>
+                                            <td className="px-0.5 py-2 text-center font-bold text-[10px] text-emerald-500">{tableTotals.closed}</td>
+                                            <td className="px-0.5 py-2 text-center font-bold text-[10px] text-amber-500">{tableTotals.pending}</td>
+                                            <td className="px-0.5 py-2 text-center font-bold text-[10px] text-red-500">{tableTotals.rejected}</td>
+                                            <td className="pr-3 pl-1 py-2 text-right font-black text-[11px]">{totalTablePercent}%</td>
+                                        </tr>
+                                        <tr>
+                                            <td colSpan={7} className="px-3 py-2 text-[9px] text-muted-foreground border-t border-border">
+                                                C = Closing, P = Pending, R = Reject
+                                            </td>
+                                        </tr>
+                                    </tfoot>
                                 </table>
                             </div>
                         </div>

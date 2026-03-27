@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
@@ -9,7 +9,7 @@ import { Loading } from '@/components/ui/loading';
 import { Alert } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
-import { ChevronRight, Bell, User } from 'lucide-react';
+import { ChevronRight, User } from 'lucide-react';
 
 // Shared types
 import { AreaSummary, DailyData } from '@/types/api.types';
@@ -19,8 +19,7 @@ import { parseSupabaseError, logError } from '@/lib/errors';
 import {
     calculateAchievement,
     calculateTimeGone,
-    getInitials,
-    calculateTotals
+    getInitials
 } from '@/lib/dashboard-logic';
 import { formatDateReadable } from '@/lib/date-utils';
 
@@ -37,11 +36,8 @@ export default function ManagerDashboardPage() {
     const todayFormatted = formatDateReadable();
     const timeGonePercent = calculateTimeGone();
 
-    useEffect(() => {
-        if (user) fetchData();
-    }, [user]);
-
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
+        if (!user) return;
         setLoading(true);
         try {
             const supabase = createClient();
@@ -75,7 +71,11 @@ export default function ManagerDashboardPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [user]);
+
+    useEffect(() => {
+        if (user) fetchData();
+    }, [user, fetchData]);
 
     const totals = areas.reduce((acc, a) => ({
         total_input: acc.total_input + a.total_input,
@@ -86,31 +86,6 @@ export default function ManagerDashboardPage() {
     }), { total_input: 0, total_pending: 0, total_rejected: 0, total_closed: 0, target: 0 });
 
     const totalPercent = calculateAchievement(totals.total_input, totals.target);
-
-    // Logic for underperformance (replicated from dashboard-logic but specific for Area types if needed)
-    // Or we can just use manual check here since structure is slightly different
-    const isUnderperform = (m: AreaSummary): boolean => {
-        // No input = underperform
-        if (m.total_input === 0) return true;
-        // If target exists, compare achievement vs time gone
-        if (m.target > 0) {
-            const achievement = calculateAchievement(m.total_input, m.target);
-            return achievement < timeGonePercent;
-        }
-        return false;
-    };
-
-    const getStatusColor = (pct: number) => {
-        if (pct >= 80) return 'text-emerald-500';
-        if (pct >= 60) return 'text-amber-500';
-        return 'text-red-500';
-    };
-
-    const getStatusBg = (pct: number) => {
-        if (pct >= 80) return 'bg-emerald-500';
-        if (pct >= 60) return 'bg-amber-500';
-        return 'bg-red-500';
-    };
 
     // Get user initials
     // user initials logic replaced by imported getInitials
@@ -253,7 +228,7 @@ export default function ManagerDashboardPage() {
                         </div>
 
                         {/* Stats Grid 4 Kolom ala SPV */}
-                        <div className="grid grid-cols-4 gap-2">
+                        <div className="grid grid-cols-3 gap-2">
                             <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-2 text-center">
                                 <div className="text-emerald-600 text-lg font-bold">{totals.total_closed}</div>
                                 <div className="text-[10px] text-emerald-600 font-medium">CLOSING</div>
@@ -265,10 +240,6 @@ export default function ManagerDashboardPage() {
                             <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-2 text-center">
                                 <div className="text-red-600 text-lg font-bold">{totals.total_rejected}</div>
                                 <div className="text-[10px] text-red-600 font-medium">REJECT</div>
-                            </div>
-                            <div className="bg-primary/10 border border-primary/20 rounded-xl p-2 text-center">
-                                <div className="text-primary text-lg font-bold">{totals.total_closed}</div>
-                                <div className="text-[10px] text-primary font-medium">ACC</div>
                             </div>
                         </div>
                     </div>

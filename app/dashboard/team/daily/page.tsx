@@ -1,13 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
 import SpvHeader from '@/components/SpvHeader';
 import { Loading } from '@/components/ui/loading';
 import { Alert } from '@/components/ui/alert';
 import { createClient } from '@/lib/supabase/client';
-import { Card, CardContent } from '@/components/ui/card';
 import { Calendar, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -37,7 +36,6 @@ export default function SpvDailyPage() {
     const [selectedSator, setSelectedSator] = useState<string>('all');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [areaName, setAreaName] = useState<string>('');
 
     // Modal states
     const [showModal, setShowModal] = useState(false);
@@ -74,29 +72,15 @@ export default function SpvDailyPage() {
     const selectedDateLabel = dateOptions.find(d => d.value === selectedDate)?.label ||
         new Date(selectedDate).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' });
 
-    useEffect(() => {
-        if (user) fetchData();
-    }, [user, selectedDate]);
-
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
+        if (!user) return;
         setLoading(true);
         try {
             const supabase = createClient();
 
-            // Get area name
-            const { data: hierarchyData } = await supabase
-                .from('hierarchy')
-                .select('area')
-                .eq('user_id', user?.id)
-                .single();
-
-            if (hierarchyData?.area) {
-                setAreaName(hierarchyData.area);
-            }
-
             // Fetch daily data from Edge Function (includes promotors and sators)
             const { data, error } = await supabase.functions.invoke('dashboard-team-daily', {
-                body: { userId: user?.id, date: selectedDate }
+                body: { userId: user.id, date: selectedDate }
             });
 
             if (error) throw error;
@@ -128,7 +112,11 @@ export default function SpvDailyPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [selectedDate, user]);
+
+    useEffect(() => {
+        if (user) fetchData();
+    }, [user, selectedDate, fetchData]);
 
     const openPromotorDetail = async (promotor: PromotorWithDetail) => {
         setModalPromotor(promotor);
@@ -165,7 +153,7 @@ export default function SpvDailyPage() {
     const getStatusBadge = (status: string) => {
         switch (status?.toLowerCase()) {
             case 'acc':
-                return <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/20 text-success">ACC</span>;
+                return <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/20 text-success">CLOSING</span>;
             case 'pending':
                 return <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-warning/20 text-warning">PENDING</span>;
             case 'reject':

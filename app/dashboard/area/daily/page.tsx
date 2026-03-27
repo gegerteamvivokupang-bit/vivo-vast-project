@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
 import ManagerHeader from '@/components/ManagerHeader';
@@ -8,7 +8,6 @@ import { Loading } from '@/components/ui/loading';
 import { Alert } from '@/components/ui/alert';
 import { createClient } from '@/lib/supabase/client';
 import { ChevronRight, Calendar, Check, X } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 // Shared Types
@@ -62,21 +61,6 @@ interface DailyDataDetail {
     areas: LocalArea[];
 }
 
-interface Submission {
-    id: string;
-    customer_name: string;
-    customer_phone: string;
-    sale_date: string;
-    status: string;
-    limit_amount: number;
-    dp_amount: number;
-    tenor: number;
-    pekerjaan: string;
-    penghasilan: number;
-    has_npwp: boolean;
-    image_urls: string[];
-}
-
 export default function ManagerDailyPage() {
     const { user } = useAuth();
     const [data, setData] = useState<DailyDataDetail | null>(null);
@@ -119,11 +103,8 @@ export default function ManagerDailyPage() {
     const selectedDateLabel = dateOptions.find(d => d.value === selectedDate)?.label ||
         new Date(selectedDate).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' });
 
-    useEffect(() => {
-        if (user) fetchData();
-    }, [user, selectedDate]);
-
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
+        if (!user) return;
         setLoading(true);
         try {
             const supabase = createClient();
@@ -140,7 +121,11 @@ export default function ManagerDailyPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [selectedDate, user]);
+
+    useEffect(() => {
+        if (user) fetchData();
+    }, [user, selectedDate, fetchData]);
 
     const openPromotorDetail = async (promotor: LocalPromotor) => {
         setModalPromotor(promotor);
@@ -171,7 +156,7 @@ export default function ManagerDailyPage() {
             if (error) throw error;
 
             // Transform status
-            const transformed = (submissions || []).map((item: any) => {
+            const transformed = (submissions || []).map((item) => {
                 let displayStatus = item.status;
                 if (item.approval_status === 'approved') {
                     displayStatus = item.transaction_status === 'closed' ? 'acc' : 'pending';
@@ -235,7 +220,7 @@ export default function ManagerDailyPage() {
     const getStatusBadge = (status: string) => {
         switch (status) {
             case 'acc':
-                return <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/20 text-success">ACC</span>;
+                return <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/20 text-success">CLOSING</span>;
             case 'pending':
                 return <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-warning/20 text-warning">PENDING</span>;
             case 'reject':

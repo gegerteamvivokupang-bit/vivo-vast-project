@@ -70,17 +70,18 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Validate phone type exists (if provided)
+    // Validate phone type exists and is active (if provided)
     if (body.phoneTypeId) {
       const { data: phoneData, error: phoneError } = await supabaseClient
         .from('phone_types')
         .select('id')
         .eq('id', body.phoneTypeId)
+        .eq('is_active', true)
         .single()
 
       if (phoneError || !phoneData) {
         return new Response(
-          JSON.stringify({ success: false, message: 'Invalid phone type ID' }),
+          JSON.stringify({ success: false, message: 'Invalid or inactive phone type ID' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }

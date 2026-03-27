@@ -1,13 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
 import { ProfileSidebar } from '@/components/ProfileSidebar';
 import { Loading } from '@/components/ui/loading';
 import { Alert } from '@/components/ui/alert';
-import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { User, ChevronRight } from 'lucide-react';
@@ -16,9 +15,28 @@ import { User, ChevronRight } from 'lucide-react';
 import { SatorData, PromotorData, MonthlySummary, DailyData } from '@/types/api.types';
 
 // Utilities
-import { parseSupabaseError, retryWithBackoff, logError } from '@/lib/errors';
+import { parseSupabaseError, logError } from '@/lib/errors';
 import { processDualRoleSPV, calculateAchievement } from '@/lib/dashboard-logic';
-import { getCurrentMonthWITA } from '@/lib/date-utils';
+
+interface TeamMonthlyItem extends PromotorData {
+    role: 'promotor' | 'sator';
+}
+
+interface TeamMonthlyResponse {
+    subordinates?: TeamMonthlyItem[];
+    spvTarget?: number;
+}
+
+interface TeamDailyItem {
+    total_input: number;
+    total_pending: number;
+    total_rejected: number;
+    total_closed: number;
+}
+
+interface TeamDailyResponse {
+    promotors?: TeamDailyItem[];
+}
 
 export default function SpvDashboardPage() {
     const { user } = useAuth();
@@ -26,7 +44,6 @@ export default function SpvDashboardPage() {
     const [summary, setSummary] = useState<MonthlySummary>({ target: 0, input: 0, closing: 0, pending: 0, rejected: 0 });
     const [dailyData, setDailyData] = useState<DailyData | null>(null);
     const [sators, setSators] = useState<SatorData[]>([]);
-    const [promotors, setPromotors] = useState<PromotorData[]>([]);
     const [areaName, setAreaName] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -41,11 +58,8 @@ export default function SpvDashboardPage() {
     // Get user initials
     const getInitials = (name: string) => name?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || 'U';
 
-    useEffect(() => {
-        if (user) fetchData();
-    }, [user]);
-
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
+        if (!user) return;
         setLoading(true);
         try {
             const supabase = createClient();
@@ -65,12 +79,12 @@ export default function SpvDashboardPage() {
             if (monthlyRes.error) throw monthlyRes.error;
 
             // Response format: { subordinates: [...], spvTarget: number }
-            const responseData = monthlyRes.data || {};
+            const responseData = (monthlyRes.data || {}) as TeamMonthlyResponse;
             const monthlyData = responseData.subordinates || [];
             const spvAdminTarget = responseData.spvTarget || 0;
 
             // Use SPV's admin-assigned target, NOT sum of subordinate targets
-            const totals = monthlyData.reduce((acc: MonthlySummary, m: any) => ({
+            const totals = monthlyData.reduce((acc: MonthlySummary, m) => ({
                 target: acc.target, // Keep the SPV's own target (set below)
                 input: acc.input + (m.total_input || 0),
                 closing: acc.closing + (m.total_closed || 0),
@@ -80,15 +94,15 @@ export default function SpvDashboardPage() {
             setSummary(totals);
 
             // Separate SATORs and direct promotors
-            const directPromotors = monthlyData.filter((m: any) => m.role === 'promotor');
+            const directPromotors = monthlyData.filter((m) => m.role === 'promotor');
 
             // Filter out caller from satorsRaw if they have direct promotors
             // to avoid duplication (they'll be added as "self" SATOR below)
             const satorsRaw = monthlyData
-                .filter((m: any) => m.role === 'sator')
-                .filter((m: any) => !(directPromotors.length > 0 && m.user_id === user?.id));
+                .filter((m) => m.role === 'sator')
+                .filter((m) => !(directPromotors.length > 0 && m.user_id === user.id));
 
-            const satorList: SatorData[] = satorsRaw.map((m: any) => ({
+            const satorList: SatorData[] = satorsRaw.map((m) => ({
                 user_id: m.user_id,
                 name: m.name,
                 target: m.target || 0,
@@ -101,7 +115,7 @@ export default function SpvDashboardPage() {
             // Use centralized dual-role processing logic
             const finalSators = processDualRoleSPV(
                 satorList,
-                directPromotors.map((p: any) => ({
+                directPromotors.map((p) => ({
                     user_id: p.user_id,
                     name: p.name,
                     target: p.target || 0,
@@ -116,30 +130,18 @@ export default function SpvDashboardPage() {
 
             setSators(finalSators);
 
-            const promotorList: PromotorData[] = monthlyData
-                .filter((m: any) => m.role === 'promotor')
-                .map((m: any) => ({
-                    user_id: m.user_id,
-                    name: m.name,
-                    target: m.target || 0,
-                    total_input: m.total_input || 0,
-                    total_closed: m.total_closed || 0,
-                    total_pending: m.total_pending || 0,
-                    total_rejected: m.total_rejected || 0,
-                }));
-            setPromotors(promotorList);
-
             if (dailyRes.data) {
-                const dailyArr = Array.isArray(dailyRes.data) ? dailyRes.data : (dailyRes.data.promotors || []);
-                const dailyTotals = dailyArr.reduce((acc: any, p: any) => ({
+                const dailyResponse = dailyRes.data as TeamDailyItem[] | TeamDailyResponse;
+                const dailyArr = Array.isArray(dailyResponse) ? dailyResponse : (dailyResponse.promotors || []);
+                const dailyTotals = dailyArr.reduce((acc: TeamDailyItem, p) => ({
                     total_input: acc.total_input + (p.total_input || 0),
                     total_pending: acc.total_pending + (p.total_pending || 0),
                     total_rejected: acc.total_rejected + (p.total_rejected || 0),
                     total_closed: acc.total_closed + (p.total_closed || 0),
                 }), { total_input: 0, total_pending: 0, total_rejected: 0, total_closed: 0 });
 
-                const activeCount = dailyArr.filter((p: any) => (p.total_input || 0) > 0).length;
-                const emptyCount = dailyArr.filter((p: any) => (p.total_input || 0) === 0).length;
+                const activeCount = dailyArr.filter((p) => (p.total_input || 0) > 0).length;
+                const emptyCount = dailyArr.filter((p) => (p.total_input || 0) === 0).length;
                 const totalPromotors = monthlyData.length;
                 const promotorsWithDailyData = dailyArr.length;
                 const promotorsNoData = totalPromotors - promotorsWithDailyData;
@@ -162,7 +164,11 @@ export default function SpvDashboardPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [user]);
+
+    useEffect(() => {
+        if (user) fetchData();
+    }, [user, fetchData]);
 
     const targetPercent = calculateAchievement(summary.input, summary.target);
 
@@ -254,7 +260,7 @@ export default function SpvDashboardPage() {
                         </div>
 
                         {/* Stats Grid Inside Card */}
-                        <div className="grid grid-cols-4 gap-2">
+                        <div className="grid grid-cols-3 gap-2">
                             <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-2 text-center">
                                 <div className="text-emerald-600 text-lg font-bold">{summary.closing}</div>
                                 <div className="text-[10px] text-emerald-600 font-medium">CLOSING</div>
@@ -266,10 +272,6 @@ export default function SpvDashboardPage() {
                             <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-2 text-center">
                                 <div className="text-red-600 text-lg font-bold">{summary.rejected}</div>
                                 <div className="text-[10px] text-red-600 font-medium">REJECT</div>
-                            </div>
-                            <div className="bg-primary/10 border border-primary/20 rounded-xl p-2 text-center">
-                                <div className="text-primary text-lg font-bold">{summary.closing}</div>
-                                <div className="text-[10px] text-primary font-medium">ACC</div>
                             </div>
                         </div>
 
